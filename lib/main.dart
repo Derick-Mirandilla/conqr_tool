@@ -1,6 +1,7 @@
 // File: lib/main.dart
 import 'dart:typed_data';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -24,6 +25,7 @@ class QRSecurityApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'QR Security Analyzer',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -194,7 +196,7 @@ class LandingPage extends StatelessWidget {
   }
 }
 
-// History Data Model
+// History Data Model - Fixed JSON handling
 class QRAnalysisHistory {
   final String id;
   final String fileName;
@@ -214,6 +216,7 @@ class QRAnalysisHistory {
     this.content,
   });
 
+  // Fixed JSON serialization
   Map<String, dynamic> toJson() => {
     'id': id,
     'fileName': fileName,
@@ -224,18 +227,34 @@ class QRAnalysisHistory {
     'content': content,
   };
 
-  factory QRAnalysisHistory.fromJson(Map<String, dynamic> json) => QRAnalysisHistory(
-    id: json['id'],
-    fileName: json['fileName'],
-    imagePath: json['imagePath'],
-    timestamp: DateTime.parse(json['timestamp']),
-    result: json['result'],
-    confidence: json['confidence'],
-    content: json['content'],
-  );
+  // Fixed JSON deserialization with error handling
+  factory QRAnalysisHistory.fromJson(Map<String, dynamic> json) {
+    try {
+      return QRAnalysisHistory(
+        id: json['id']?.toString() ?? '',
+        fileName: json['fileName']?.toString() ?? 'Unknown',
+        imagePath: json['imagePath']?.toString() ?? '',
+        timestamp: DateTime.tryParse(json['timestamp']?.toString() ?? '') ?? DateTime.now(),
+        result: json['result']?.toString() ?? 'Unknown',
+        confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
+        content: json['content']?.toString(),
+      );
+    } catch (e) {
+      debugPrint('Error parsing QRAnalysisHistory: $e');
+      return QRAnalysisHistory(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        fileName: 'Corrupted Entry',
+        imagePath: '',
+        timestamp: DateTime.now(),
+        result: 'Error',
+        confidence: 0.0,
+        content: null,
+      );
+    }
+  }
 }
 
-// Main App Page (Updated)
+// Main App Page (Fixed history handling)
 class MainAppPage extends StatefulWidget {
   const MainAppPage({super.key});
 
@@ -265,42 +284,80 @@ class _MainAppPageState extends State<MainAppPage> {
     _loadHistory();
   }
 
+  // Fixed history loading with proper JSON handling
   Future<void> _loadHistory() async {
-    // Load history from SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    final historyJson = prefs.getStringList('qr_history') ?? [];
-    setState(() {
-      _history = historyJson.map((e) => QRAnalysisHistory.fromJson(
-        Map<String, dynamic>.from(Uri.decodeFull(e) as Map))).toList();
-    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJsonList = prefs.getStringList('qr_history') ?? [];
+      
+      setState(() {
+        _history = historyJsonList.map((jsonString) {
+          try {
+            final Map<String, dynamic> jsonMap = json.decode(jsonString);
+            return QRAnalysisHistory.fromJson(jsonMap);
+          } catch (e) {
+            debugPrint('Error decoding history item: $e');
+            return null;
+          }
+        }).where((item) => item != null).cast<QRAnalysisHistory>().toList();
+      });
+      
+      debugPrint('Loaded ${_history.length} history items');
+    } catch (e) {
+      debugPrint('Error loading history: $e');
+      setState(() {
+        _history = [];
+      });
+    }
   }
 
+  // Fixed history saving with proper JSON handling
   Future<void> _saveHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final historyJson = _history.map((e) => Uri.encodeFull(e.toJson().toString())).toList();
-    await prefs.setStringList('qr_history', historyJson);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJsonList = _history.map((item) {
+        try {
+          return json.encode(item.toJson());
+        } catch (e) {
+          debugPrint('Error encoding history item: $e');
+          return null;
+        }
+      }).where((item) => item != null).cast<String>().toList();
+      
+      await prefs.setStringList('qr_history', historyJsonList);
+      debugPrint('Saved ${historyJsonList.length} history items');
+    } catch (e) {
+      debugPrint('Error saving history: $e');
+    }
   }
 
   Future<void> _addToHistory(String fileName, String imagePath, String result, double confidence, String? content) async {
-    final history = QRAnalysisHistory(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      fileName: fileName,
-      imagePath: imagePath,
-      timestamp: DateTime.now(),
-      result: result,
-      confidence: confidence,
-      content: content,
-    );
-    
-    setState(() {
-      _history.insert(0, history);
-      if (_history.length > 50) { // Keep only last 50 records
-        _history = _history.take(50).toList();
-      }
-    });
-    
-    await _saveHistory();
+    try {
+      final history = QRAnalysisHistory(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        fileName: fileName,
+        imagePath: imagePath,
+        timestamp: DateTime.now(),
+        result: result,
+        confidence: confidence,
+        content: content,
+      );
+      
+      setState(() {
+        _history.insert(0, history);
+        if (_history.length > 50) { // Keep only last 50 records
+          _history = _history.take(50).toList();
+        }
+      });
+      
+      await _saveHistory();
+      debugPrint('Added new history item: $fileName - $result');
+    } catch (e) {
+      debugPrint('Error adding to history: $e');
+    }
   }
+
+
 
   Future<void> _loadModel() async {
     try {
@@ -1234,7 +1291,7 @@ class _MainAppPageState extends State<MainAppPage> {
   }
 }
 
-// History Page
+// Enhanced History Page with better UI and functionality
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
 
@@ -1244,6 +1301,9 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   List<QRAnalysisHistory> _history = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
+  String _filterBy = 'all'; // all, malicious, benign
 
   @override
   void initState() {
@@ -1252,21 +1312,280 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _loadHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final historyJson = prefs.getStringList('qr_history') ?? [];
-    setState(() {
-      _history = historyJson.map((e) => QRAnalysisHistory.fromJson(
-        Map<String, dynamic>.from(Uri.decodeFull(e) as Map))).toList();
-    });
+    try {
+      setState(() => _isLoading = true);
+      
+      final prefs = await SharedPreferences.getInstance();
+      final historyJsonList = prefs.getStringList('qr_history') ?? [];
+      
+      setState(() {
+        _history = historyJsonList.map((jsonString) {
+          try {
+            final Map<String, dynamic> jsonMap = json.decode(jsonString);
+            return QRAnalysisHistory.fromJson(jsonMap);
+          } catch (e) {
+            debugPrint('Error decoding history item: $e');
+            return null;
+          }
+        }).where((item) => item != null).cast<QRAnalysisHistory>().toList();
+        
+        _isLoading = false;
+      });
+      
+      debugPrint('Loaded ${_history.length} history items');
+    } catch (e) {
+      debugPrint('Error loading history: $e');
+      setState(() {
+        _history = [];
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _clearHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear History'),
+        content: const Text('Are you sure you want to delete all analysis history? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600),
+            child: const Text('Clear All', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('qr_history');
+        setState(() {
+          _history.clear();
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('History cleared successfully'),
+              backgroundColor: Colors.green.shade600,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error clearing history: $e'),
+              backgroundColor: Colors.red.shade600,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _deleteHistoryItem(QRAnalysisHistory item) async {
+    try {
+      setState(() {
+        _history.removeWhere((h) => h.id == item.id);
+      });
+      
+      final prefs = await SharedPreferences.getInstance();
+      final historyJsonList = _history.map((item) => json.encode(item.toJson())).toList();
+      await prefs.setStringList('qr_history', historyJsonList);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Item deleted from history'),
+            backgroundColor: Colors.green.shade600,
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () {
+                setState(() {
+                  _history.add(item);
+                  _history.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+                });
+                prefs.setStringList('qr_history', 
+                  _history.map((item) => json.encode(item.toJson())).toList());
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting item: $e'),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showHistoryDetails(QRAnalysisHistory item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(
+              item.result == "Malicious" ? Icons.warning : Icons.check_circle,
+              color: item.result == "Malicious" ? Colors.red.shade600 : Colors.green.shade600,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text('Analysis Details')),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDetailRow('File Name', item.fileName),
+              _buildDetailRow('Result', item.result),
+              _buildDetailRow('Confidence', '${(item.confidence * 100).toStringAsFixed(1)}%'),
+              _buildDetailRow('Date', '${item.timestamp.day}/${item.timestamp.month}/${item.timestamp.year}'),
+              _buildDetailRow('Time', '${item.timestamp.hour}:${item.timestamp.minute.toString().padLeft(2, '0')}'),
+              if (item.content != null) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'QR Content:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    item.content!,
+                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          if (item.content != null)
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: item.content!));
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Content copied to clipboard')),
+                );
+              },
+              child: const Text('Copy Content'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+            ),
+          ),
+          Expanded(
+            child: Text(value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<QRAnalysisHistory> get _filteredHistory {
+    var filtered = _history;
+    
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((item) =>
+        item.fileName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+        (item.content?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false)
+      ).toList();
+    }
+    
+    // Apply result filter
+    if (_filterBy != 'all') {
+      filtered = filtered.where((item) =>
+        item.result.toLowerCase() == _filterBy.toLowerCase()
+      ).toList();
+    }
+    
+    return filtered;
   }
 
   @override
   Widget build(BuildContext context) {
+    final filteredItems = _filteredHistory;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Analysis History', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blue.shade600,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) {
+              if (value == 'clear') {
+                _clearHistory();
+              } else if (value == 'refresh') {
+                _loadHistory();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'refresh',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh),
+                    SizedBox(width: 8),
+                    Text('Refresh'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'clear',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_forever, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Clear All', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -1276,64 +1595,203 @@ class _HistoryPageState extends State<HistoryPage> {
             colors: [Colors.blue.shade50, Colors.white],
           ),
         ),
-        child: _history.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.history, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text(
-                      'No analysis history yet',
-                      style: TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _history.length,
-                itemBuilder: (context, index) {
-                  final item = _history[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      leading: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: item.result == "Malicious" ? Colors.red.shade100 : Colors.green.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          item.result == "Malicious" ? Icons.warning : Icons.check_circle,
-                          color: item.result == "Malicious" ? Colors.red.shade600 : Colors.green.shade600,
-                          size: 32,
-                        ),
-                      ),
-                      title: Text(
-                        item.fileName,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  // Search and Filter Section
+                  if (_history.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
                         children: [
-                          const SizedBox(height: 4),
-                          Text('Result: ${item.result}'),
-                          Text('Confidence: ${(item.confidence * 100).toStringAsFixed(1)}%'),
-                          Text('Date: ${item.timestamp.day}/${item.timestamp.month}/${item.timestamp.year}'),
+                          // Search Bar
+                          TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Search history...',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            ),
+                            onChanged: (value) => setState(() => _searchQuery = value),
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Filter Chips
+                          Row(
+                            children: [
+                              const Text('Filter: ', style: TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(width: 8),
+                              FilterChip(
+                                label: const Text('All'),
+                                selected: _filterBy == 'all',
+                                onSelected: (selected) => setState(() => _filterBy = 'all'),
+                              ),
+                              const SizedBox(width: 8),
+                              FilterChip(
+                                label: const Text('Malicious'),
+                                selected: _filterBy == 'malicious',
+                                onSelected: (selected) => setState(() => _filterBy = 'malicious'),
+                                selectedColor: Colors.red.shade100,
+                              ),
+                              const SizedBox(width: 8),
+                              FilterChip(
+                                label: const Text('Benign'),
+                                selected: _filterBy == 'benign',
+                                onSelected: (selected) => setState(() => _filterBy = 'benign'),
+                                selectedColor: Colors.green.shade100,
+                              ),
+                            ],
+                          ),
                         ],
                       ),
-                      trailing: Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.grey.shade400,
-                      ),
                     ),
-                  );
-                },
+                  ],
+                  
+                  // History List
+                  Expanded(
+                    child: filteredItems.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _history.isEmpty ? Icons.history : Icons.search_off,
+                                  size: 64,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _history.isEmpty 
+                                    ? 'No analysis history yet'
+                                    : 'No results found',
+                                  style: const TextStyle(fontSize: 18, color: Colors.grey),
+                                ),
+                                if (_history.isEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Start analyzing QR codes to see your history here',
+                                    style: TextStyle(color: Colors.grey),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: filteredItems.length,
+                            itemBuilder: (context, index) {
+                              final item = filteredItems[index];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.all(16),
+                                  leading: Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: item.result == "Malicious" ? Colors.red.shade100 : Colors.green.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      item.result == "Malicious" ? Icons.warning : Icons.check_circle,
+                                      color: item.result == "Malicious" ? Colors.red.shade600 : Colors.green.shade600,
+                                      size: 32,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    item.fileName,
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: item.result == "Malicious" 
+                                                ? Colors.red.shade600 
+                                                : Colors.green.shade600,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              item.result,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${(item.confidence * 100).toStringAsFixed(1)}%',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${item.timestamp.day}/${item.timestamp.month}/${item.timestamp.year} '
+                                        '${item.timestamp.hour}:${item.timestamp.minute.toString().padLeft(2, '0')}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: PopupMenuButton<String>(
+                                    onSelected: (value) {
+                                      if (value == 'details') {
+                                        _showHistoryDetails(item);
+                                      } else if (value == 'delete') {
+                                        _deleteHistoryItem(item);
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'details',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.info_outline),
+                                            SizedBox(width: 8),
+                                            Text('View Details'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete, color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text('Delete', style: TextStyle(color: Colors.red)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () => _showHistoryDetails(item),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
       ),
     );
@@ -1718,7 +2176,7 @@ class ContactPage extends StatelessWidget {
   }
 }
 
-// QR Scanner Page (unchanged but with updated styling)
+// QR Scanner Page (enhanced with better UI)
 class QRScannerPage extends StatefulWidget {
   @override
   State<QRScannerPage> createState() => _QRScannerPageState();
@@ -1727,6 +2185,8 @@ class QRScannerPage extends StatefulWidget {
 class _QRScannerPageState extends State<QRScannerPage> {
   mobile.MobileScannerController cameraController = mobile.MobileScannerController();
   bool _screenOpened = false;
+  bool _isFlashOn = false;
+  bool _isFrontCamera = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1735,9 +2195,38 @@ class _QRScannerPageState extends State<QRScannerPage> {
         title: const Text('Scan QR Code', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blue.shade600,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          // Flash toggle
+          IconButton(
+            onPressed: () async {
+              await cameraController.toggleTorch();
+              setState(() {
+                _isFlashOn = !_isFlashOn;
+              });
+            },
+            icon: Icon(
+              _isFlashOn ? Icons.flash_on : Icons.flash_off,
+              color: Colors.white,
+            ),
+          ),
+          // Camera switch
+          IconButton(
+            onPressed: () async {
+              await cameraController.switchCamera();
+              setState(() {
+                _isFrontCamera = !_isFrontCamera;
+              });
+            },
+            icon: const Icon(
+              Icons.switch_camera,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
       body: Stack(
         children: [
+          // Camera view
           mobile.MobileScanner(
             controller: cameraController,
             onDetect: (capture) {
@@ -1746,6 +2235,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
                 for (final barcode in barcodes) {
                   if (barcode.rawValue != null) {
                     _screenOpened = true;
+                    
+                    // Show success feedback
+                    HapticFeedback.lightImpact();
+                    
+                    // Return the scanned content
                     Navigator.pop(context, barcode.rawValue);
                     break;
                   }
@@ -1753,7 +2247,21 @@ class _QRScannerPageState extends State<QRScannerPage> {
               }
             },
           ),
-          // Overlay with instructions
+          
+          // Scanning overlay
+          Container(
+            decoration: ShapeDecoration(
+              shape: QrScannerOverlayShape(
+                borderColor: Colors.white,
+                borderRadius: 10,
+                borderLength: 30,
+                borderWidth: 5,
+                cutOutSize: MediaQuery.of(context).size.width * 0.7,
+              ),
+            ),
+          ),
+          
+          // Instructions overlay
           Positioned(
             bottom: 100,
             left: 20,
@@ -1761,18 +2269,96 @@ class _QRScannerPageState extends State<QRScannerPage> {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Position the QR code within the frame to scan',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.qr_code_scanner,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Position the QR code within the frame',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'The QR code will be scanned automatically',
+                    style: TextStyle(
+                      color: Colors.grey.shade300,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
+            ),
+          ),
+          
+          // Status indicators
+          Positioned(
+            top: 20,
+            left: 20,
+            right: 20,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (_isFlashOn)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.yellow.shade600,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.flash_on, color: Colors.black, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'Flash On',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const Spacer(),
+                if (_isFrontCamera)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade600,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.camera_front, color: Colors.white, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'Front Camera',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -1784,5 +2370,157 @@ class _QRScannerPageState extends State<QRScannerPage> {
   void dispose() {
     cameraController.dispose();
     super.dispose();
+  }
+}
+
+// QR Scanner Overlay Shape
+class QrScannerOverlayShape extends ShapeBorder {
+  const QrScannerOverlayShape({
+    this.borderColor = Colors.red,
+    this.borderWidth = 3.0,
+    this.overlayColor = const Color.fromRGBO(0, 0, 0, 80),
+    this.borderRadius = 0,
+    this.borderLength = 40,
+    double? cutOutSize,
+  }) : cutOutSize = cutOutSize ?? 250;
+
+  final Color overlayColor;
+  final Color borderColor;
+  final double borderWidth;
+  final double borderRadius;
+  final double borderLength;
+  final double cutOutSize;
+
+  @override
+  EdgeInsetsGeometry get dimensions => const EdgeInsets.all(10);
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) {
+    return Path()
+      ..fillType = PathFillType.evenOdd
+      ..addPath(getOuterPath(rect), Offset.zero);
+  }
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
+    Path _getLeftTopPath(Rect rect) {
+      return Path()
+        ..moveTo(rect.left, rect.bottom)
+        ..lineTo(rect.left, rect.top + borderRadius)
+        ..quadraticBezierTo(rect.left, rect.top, rect.left + borderRadius, rect.top)
+        ..lineTo(rect.right, rect.top);
+    }
+
+    return _getLeftTopPath(rect)
+      ..lineTo(rect.right, rect.bottom)
+      ..lineTo(rect.left, rect.bottom)
+      ..lineTo(rect.left, rect.top);
+  }
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    final width = rect.width;
+    final height = rect.height;
+    final borderOffset = borderWidth / 2;
+    final _cutOutSize = cutOutSize < width && cutOutSize < height 
+        ? cutOutSize 
+        : (width < height ? width : height) - borderOffset * 2;
+    final _cutOutRadius = borderRadius + borderOffset;
+
+    final cutOutRect = Rect.fromLTWH(
+      rect.left + width / 2 - _cutOutSize / 2 + borderOffset,
+      rect.top + height / 2 - _cutOutSize / 2 + borderOffset,
+      _cutOutSize - borderOffset * 2,
+      _cutOutSize - borderOffset * 2,
+    );
+
+    final cutOutRRect = RRect.fromRectAndRadius(
+      cutOutRect,
+      Radius.circular(_cutOutRadius),
+    );
+
+    final overlayPaint = Paint()
+      ..color = overlayColor;
+
+    final borderPaint = Paint()
+      ..color = borderColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = borderWidth;
+
+    // Fixed: Create the overlay with a hole in the middle
+    final overlayPath = Path()
+      ..addRect(rect)  // Add the full rectangle
+      ..addRRect(cutOutRRect)  // Add the cutout area
+      ..fillType = PathFillType.evenOdd;  // This creates the hole
+
+    // Draw the overlay with the hole
+    canvas.drawPath(overlayPath, overlayPaint);
+
+    // Draw border corners
+    final cornerRadius = _cutOutRadius;
+    final cornerPath = Path();
+
+    // Top Left
+    cornerPath.moveTo(cutOutRect.left - borderOffset, cutOutRect.top + cornerRadius);
+    cornerPath.quadraticBezierTo(
+      cutOutRect.left - borderOffset, 
+      cutOutRect.top - borderOffset, 
+      cutOutRect.left + cornerRadius, 
+      cutOutRect.top - borderOffset
+    );
+    cornerPath.lineTo(cutOutRect.left + borderLength, cutOutRect.top - borderOffset);
+
+    cornerPath.moveTo(cutOutRect.left - borderOffset, cutOutRect.top + borderLength);
+    cornerPath.lineTo(cutOutRect.left - borderOffset, cutOutRect.top + cornerRadius);
+
+    // Top Right
+    cornerPath.moveTo(cutOutRect.right + borderOffset, cutOutRect.top + cornerRadius);
+    cornerPath.quadraticBezierTo(
+      cutOutRect.right + borderOffset, 
+      cutOutRect.top - borderOffset, 
+      cutOutRect.right - cornerRadius, 
+      cutOutRect.top - borderOffset
+    );
+    cornerPath.lineTo(cutOutRect.right - borderLength, cutOutRect.top - borderOffset);
+
+    cornerPath.moveTo(cutOutRect.right + borderOffset, cutOutRect.top + borderLength);
+    cornerPath.lineTo(cutOutRect.right + borderOffset, cutOutRect.top + cornerRadius);
+
+    // Bottom Left
+    cornerPath.moveTo(cutOutRect.left - borderOffset, cutOutRect.bottom - cornerRadius);
+    cornerPath.quadraticBezierTo(
+      cutOutRect.left - borderOffset, 
+      cutOutRect.bottom + borderOffset, 
+      cutOutRect.left + cornerRadius, 
+      cutOutRect.bottom + borderOffset
+    );
+    cornerPath.lineTo(cutOutRect.left + borderLength, cutOutRect.bottom + borderOffset);
+
+    cornerPath.moveTo(cutOutRect.left - borderOffset, cutOutRect.bottom - borderLength);
+    cornerPath.lineTo(cutOutRect.left - borderOffset, cutOutRect.bottom - cornerRadius);
+
+    // Bottom Right
+    cornerPath.moveTo(cutOutRect.right + borderOffset, cutOutRect.bottom - cornerRadius);
+    cornerPath.quadraticBezierTo(
+      cutOutRect.right + borderOffset, 
+      cutOutRect.bottom + borderOffset, 
+      cutOutRect.right - cornerRadius, 
+      cutOutRect.bottom + borderOffset
+    );
+    cornerPath.lineTo(cutOutRect.right - borderLength, cutOutRect.bottom + borderOffset);
+
+    cornerPath.moveTo(cutOutRect.right + borderOffset, cutOutRect.bottom - borderLength);
+    cornerPath.lineTo(cutOutRect.right + borderOffset, cutOutRect.bottom - cornerRadius);
+
+    canvas.drawPath(cornerPath, borderPaint);
+  }
+
+  @override
+  ShapeBorder scale(double t) {
+    return QrScannerOverlayShape(
+      borderColor: borderColor,
+      borderWidth: borderWidth,
+      overlayColor: overlayColor,
+    );
   }
 }
