@@ -47,7 +47,8 @@ flutter:
   
   # Add your TFLite model to assets
   assets:
-    - assets/benign_sample.png
-    - assets/malicious_sample.png
+    - assets/images/benign_sample.png
+    - assets/images/malicious_sample.png
     - assets/models/qr_security_model.tflite
     - assets/models/model.tflite
+    - assets/images/

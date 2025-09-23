@@ -27,7 +27,7 @@ class QRSecurityApp extends StatelessWidget {
       title: 'QR Security Analyzer',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.orange,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       home: const LandingPage(),
@@ -41,7 +41,6 @@ class QRSecurityApp extends StatelessWidget {
   }
 }
 
-// Landing Page
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
 
@@ -50,14 +49,7 @@ class LandingPage extends StatelessWidget {
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.blue.shade50,
-              Colors.white,
-            ],
-          ),
+          color: Color(0xFF292727)
         ),
         child: SafeArea(
           child: Column(
@@ -69,56 +61,11 @@ class LandingPage extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade600,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.shade200,
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.qr_code_scanner,
-                        size: 60,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'QR Security',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Analyzer',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w300,
-                        color: Colors.blue.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 40),
-                      child: Text(
-                        'Advanced QR code security analysis powered by machine learning',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade600,
-                          height: 1.4,
-                        ),
-                      ),
+                    Image.asset(
+                      'assets/images/logo.png', 
+                      width: 400,
+                      height: 240,
+                      fit: BoxFit.contain,
                     ),
                   ],
                 ),
@@ -139,10 +86,9 @@ class LandingPage extends StatelessWidget {
                             Navigator.pushNamed(context, '/main');
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue.shade600,
+                            backgroundColor: Color(0xFFFF8A00),
                             foregroundColor: Colors.white,
                             elevation: 8,
-                            shadowColor: Colors.blue.shade200,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(28),
                             ),
@@ -164,12 +110,10 @@ class LandingPage extends StatelessWidget {
                           onPressed: () {
                             Navigator.pushNamed(context, '/about');
                           },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.blue.shade600,
-                            side: BorderSide(
-                              color: Colors.blue.shade600,
-                              width: 2,
-                            ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFD9D9D9),
+                            foregroundColor: Color(0xFF292727),
+                            elevation: 8,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(28),
                             ),
@@ -254,7 +198,7 @@ class QRAnalysisHistory {
   }
 }
 
-// Main App Page (Fixed history handling)
+// Main App Page 
 class MainAppPage extends StatefulWidget {
   const MainAppPage({super.key});
 
@@ -496,7 +440,7 @@ class _MainAppPageState extends State<MainAppPage> {
       _interpreter.run(input, output);
       
       final score = output[0][0];
-      final label = score >= 0.5 ? "Malicious" : "Benign";
+      final label = score >= 0.35 ? "Malicious" : "Benign";
       
       // Store the decoded content and analysis results for potential opening
       _decodedContent = content;
@@ -661,7 +605,7 @@ class _MainAppPageState extends State<MainAppPage> {
                           child: Text(
                             _showContent ? 'Hide Content' : 'Reveal Content',
                             style: TextStyle(
-                              color: Colors.blue.shade600,
+                              color: Color(0xFFFF8A00),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -716,7 +660,7 @@ class _MainAppPageState extends State<MainAppPage> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: isMalicious ? Colors.red.shade700 : Colors.blue.shade700,
+                          color: isMalicious ? Colors.red.shade700 : Color(0xFFFF8A00),
                         ),
                       ),
                   ],
@@ -741,7 +685,7 @@ class _MainAppPageState extends State<MainAppPage> {
                     },
                     child: Text(
                       'Copy Content',
-                      style: TextStyle(color: Colors.blue.shade600),
+                      style: TextStyle(color: Color(0xFFFF8A00)),
                     ),
                   ),
                 
@@ -1079,86 +1023,127 @@ class _MainAppPageState extends State<MainAppPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Icon(Icons.qr_code_scanner, color: Colors.white),
-            const SizedBox(width: 8),
-            const Text('QR Analyzer', style: TextStyle(color: Colors.white)),
-          ],
-        ),
-        backgroundColor: Colors.blue.shade600,
-        elevation: 0,
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onSelected: (String value) {
-              Navigator.pushNamed(context, '/$value');
-            },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(value: 'history', child: Text('HISTORY')),
-              const PopupMenuItem(value: 'about', child: Text('ABOUT')),
-              const PopupMenuItem(value: 'contact', child: Text('CONTACT')),
-            ],
-          ),
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: Row(
+        children: [
+          Image.asset(
+            'assets/images/logo.png',
+            height: 70,
+            fit: BoxFit.contain,
+          )
         ],
       ),
-      body: Container(
+      backgroundColor: Color(0xFFFF8A00),
+      elevation: 0,
+      iconTheme: IconThemeData(color: Colors.white),
+    ),
+    drawer: Drawer(
+      child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.blue.shade50,
-              Colors.white,
+              Color(0xFF3A3838),
+              Color(0xFF2A2828),
             ],
           ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // Display section
-              if (_selectedImage != null || _regeneratedQRImage != null) ...[
-                _buildQRDisplay(),
-                const SizedBox(height: 20),
-              ],
-              
-              // Analysis indicator
-              if (_isAnalyzing) ...[
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Column(
-                    children: [
-                      CircularProgressIndicator(color: Colors.blue.shade600),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Analyzing QR Code...',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.blue.shade800,
-                        ),
-                      ),
-                    ],
-                  ),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFFF8A00),
+                    Color(0xFFE67700),
+                  ],
                 ),
-                const SizedBox(height: 20),
-              ],
-              
-              // Result display
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.qr_code_scanner,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'QR Code Analyzer',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Smart Analysis Tool',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildDrawerItem(
+              context,
+              icon: Icons.history,
+              title: 'History',
+              route: '/history',
+              description: 'View past scans',
+            ),
+            _buildDrawerItem(
+              context,
+              icon: Icons.info_outline,
+              title: 'About',
+              route: '/about',
+              description: 'Learn more about the app',
+            ),
+            _buildDrawerItem(
+              context,
+              icon: Icons.contact_support,
+              title: 'Contact',
+              route: '/contact',
+              description: 'Get in touch with us',
+            ),
+          ],
+        ),
+      ),
+    ),
+    body: Container(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Display section
+            if (_selectedImage != null || _regeneratedQRImage != null) ...[
+              _buildQRDisplay(),
+              const SizedBox(height: 20),
+            ],
+            
+            // Analysis indicator
+            if (_isAnalyzing) ...[
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Color(0xFFFF8A00)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.grey.shade200,
@@ -1169,121 +1154,207 @@ class _MainAppPageState extends State<MainAppPage> {
                 ),
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.analytics,
-                      size: 32,
-                      color: Colors.blue.shade600,
-                    ),
-                    const SizedBox(height: 12),
+                    CircularProgressIndicator(color: Color(0xFFFF8A00)),
+                    const SizedBox(height: 16),
                     Text(
-                      _result,
-                      style: const TextStyle(
+                      'Analyzing QR Code...',
+                      style: TextStyle(
                         fontSize: 16,
-                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
-              
-              const SizedBox(height: 30),
-              
-              // Upload button
+              const SizedBox(height: 20),
+            ],
+            
+            // Result display
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.shade200,
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.analytics,
+                    size: 32,
+                    color: Color(0xFFFF8A00),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _result,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.4,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 30),
+            
+            // Upload button
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: _showUploadDialog,
+                icon: const Icon(Icons.upload, color: Colors.white),
+                label: const Text(
+                  'Upload QR Code',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFFF8A00),
+                  elevation: 8,
+                  shadowColor: Colors.black.withOpacity(0.3),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                ),
+              ),
+            ),
+
+            // Review Analysis button (only show if there's a completed analysis)
+            if (_decodedContent != null && _analysisResult != null) ...[
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: _showUploadDialog,
-                  icon: const Icon(Icons.upload, color: Colors.white),
-                  label: const Text(
-                    'Upload QR Code',
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showPostAnalysisDialog(
+                    _analysisResult!, 
+                    _analysisConfidence!, 
+                    _decodedContent!
+                  ),
+                  icon: Icon(Icons.info_outline, color: Color(0xFFFF8A00)),
+                  label: Text(
+                    'Review Analysis Results',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: Color(0xFFFF8A00),
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade600,
-                    elevation: 8,
-                    shadowColor: Colors.blue.shade200,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Color(0xFFFF8A00), width: 2),
+                    backgroundColor: Colors.transparent,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                ),
-              ),
-
-              // Review Analysis button (only show if there's a completed analysis)
-              if (_decodedContent != null && _analysisResult != null) ...[
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showPostAnalysisDialog(
-                      _analysisResult!, 
-                      _analysisConfidence!, 
-                      _decodedContent!
-                    ),
-                    icon: Icon(Icons.info_outline, color: Colors.blue.shade600),
-                    label: Text(
-                      'Review Analysis Results',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blue.shade600,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.blue.shade600, width: 2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              
-              const SizedBox(height: 30),
-              
-              // Status indicator
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _isInitialized ? Colors.green.shade50 : Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _isInitialized ? Colors.green.shade200 : Colors.orange.shade200,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _isInitialized ? Icons.check_circle : Icons.hourglass_empty,
-                      color: _isInitialized ? Colors.green.shade600 : Colors.orange.shade600,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isInitialized ? "Model Ready" : "Loading Model...",
-                      style: TextStyle(
-                        color: _isInitialized ? Colors.green.shade600 : Colors.orange.shade600,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ],
-          ),
+            
+            const SizedBox(height: 30),
+            
+            // Status indicator
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isInitialized 
+                  ? Color(0xFFFF8A00).withOpacity(0.1) 
+                  : Colors.orange.shade600.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _isInitialized ? Color(0xFFFF8A00) : Colors.orange.shade600,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isInitialized ? Icons.check_circle : Icons.hourglass_empty,
+                    color: _isInitialized ? Color(0xFFFF8A00) : Colors.orange.shade600,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isInitialized ? "Model Ready" : "Loading Model...",
+                    style: TextStyle(
+                      color: _isInitialized ? Color(0xFFFF8A00) : Colors.orange.shade600,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-  
+    ),
+  );
+}
+
+Widget _buildDrawerItem(
+  BuildContext context, {
+  required IconData icon,
+  required String title,
+  required String route,
+  required String description,
+}) {
+  return Container(
+    margin: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    child: ListTile(
+      leading: Container(
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: Color(0xFFFF8A00),
+          size: 20,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(
+        description,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.7),
+          fontSize: 12,
+        ),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      onTap: () {
+        Navigator.pop(context); // Close the drawer
+        Navigator.pushNamed(context, route);
+      },
+      hoverColor: Colors.white.withOpacity(0.1),
+      splashColor: Color(0xFFFF8A00).withOpacity(0.3),
+    ),
+  );
+}
+
   @override
   void dispose() {
     _interpreter.close();
@@ -1291,7 +1362,7 @@ class _MainAppPageState extends State<MainAppPage> {
   }
 }
 
-// Enhanced History Page with better UI and functionality
+// History Page
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
 
@@ -1346,16 +1417,24 @@ class _HistoryPageState extends State<HistoryPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear History'),
-        content: const Text('Are you sure you want to delete all analysis history? This action cannot be undone.'),
+        backgroundColor: Color(0xFF3A3838),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Clear History', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Are you sure you want to delete all analysis history? This action cannot be undone.',
+          style: TextStyle(color: Colors.grey),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[400])),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             child: const Text('Clear All', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -1374,7 +1453,7 @@ class _HistoryPageState extends State<HistoryPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('History cleared successfully'),
-              backgroundColor: Colors.green.shade600,
+              backgroundColor: Color(0xFFFF8A00),
             ),
           );
         }
@@ -1405,9 +1484,10 @@ class _HistoryPageState extends State<HistoryPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Item deleted from history'),
-            backgroundColor: Colors.green.shade600,
+            backgroundColor: Color(0xFFFF8A00),
             action: SnackBarAction(
               label: 'Undo',
+              textColor: Colors.white,
               onPressed: () {
                 setState(() {
                   _history.add(item);
@@ -1436,15 +1516,16 @@ class _HistoryPageState extends State<HistoryPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Color(0xFF3A3838),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Icon(
               item.result == "Malicious" ? Icons.warning : Icons.check_circle,
-              color: item.result == "Malicious" ? Colors.red.shade600 : Colors.green.shade600,
+              color: item.result == "Malicious" ? Colors.red.shade600 : Color(0xFFFF8A00),
             ),
             const SizedBox(width: 12),
-            Expanded(child: Text('Analysis Details')),
+            Expanded(child: Text('Analysis Details', style: TextStyle(color: Colors.white))),
           ],
         ),
         content: SingleChildScrollView(
@@ -1461,19 +1542,20 @@ class _HistoryPageState extends State<HistoryPage> {
                 const SizedBox(height: 16),
                 const Text(
                   'QR Content:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: Color(0xFF292727),
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[600]!),
                   ),
                   child: SelectableText(
                     item.content!,
-                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.white),
                   ),
                 ),
               ],
@@ -1483,18 +1565,25 @@ class _HistoryPageState extends State<HistoryPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: Text('Close', style: TextStyle(color: Colors.grey[400])),
           ),
           if (item.content != null)
-            TextButton(
+            ElevatedButton(
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: item.content!));
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Content copied to clipboard')),
+                  SnackBar(
+                    content: const Text('Content copied to clipboard'),
+                    backgroundColor: Color(0xFFFF8A00),
+                  ),
                 );
               },
-              child: const Text('Copy Content'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFFF8A00),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Copy Content', style: TextStyle(color: Colors.white)),
             ),
         ],
       ),
@@ -1511,11 +1600,14 @@ class _HistoryPageState extends State<HistoryPage> {
             width: 80,
             child: Text(
               '$label:',
-              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[400]),
             ),
           ),
           Expanded(
-            child: Text(value),
+            child: Text(
+              value,
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -1550,11 +1642,12 @@ class _HistoryPageState extends State<HistoryPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Analysis History', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blue.shade600,
+        backgroundColor: Color(0xFFFF8A00),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
+            color: Color(0xFF3A3838),
             onSelected: (value) {
               if (value == 'clear') {
                 _clearHistory();
@@ -1563,17 +1656,17 @@ class _HistoryPageState extends State<HistoryPage> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'refresh',
                 child: Row(
                   children: [
-                    Icon(Icons.refresh),
+                    Icon(Icons.refresh, color: Color(0xFFFF8A00)),
                     SizedBox(width: 8),
-                    Text('Refresh'),
+                    Text('Refresh', style: TextStyle(color: Colors.white)),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'clear',
                 child: Row(
                   children: [
@@ -1589,14 +1682,14 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.blue.shade50, Colors.white],
-          ),
+          color: Color(0xFF292727),
         ),
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFFFF8A00),
+                ),
+              )
             : Column(
                 children: [
                   // Search and Filter Section
@@ -1607,13 +1700,26 @@ class _HistoryPageState extends State<HistoryPage> {
                         children: [
                           // Search Bar
                           TextField(
+                            style: TextStyle(color: Colors.white),
                             decoration: InputDecoration(
                               hintText: 'Search history...',
-                              prefixIcon: const Icon(Icons.search),
+                              hintStyle: TextStyle(color: Colors.grey[400]),
+                              prefixIcon: Icon(Icons.search, color: Color(0xFFFF8A00)),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[600]!),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[600]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Color(0xFFFF8A00), width: 2),
                               ),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                              filled: true,
+                              fillColor: Color(0xFF3A3838),
                             ),
                             onChanged: (value) => setState(() => _searchQuery = value),
                           ),
@@ -1622,26 +1728,39 @@ class _HistoryPageState extends State<HistoryPage> {
                           // Filter Chips
                           Row(
                             children: [
-                              const Text('Filter: ', style: TextStyle(fontWeight: FontWeight.w600)),
+                              Text('Filter: ', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
                               const SizedBox(width: 8),
                               FilterChip(
                                 label: const Text('All'),
+                                labelStyle: TextStyle(
+                                  color: _filterBy == 'all' ? Colors.white : Colors.grey[400],
+                                ),
                                 selected: _filterBy == 'all',
+                                selectedColor: Color(0xFFFF8A00),
+                                backgroundColor: Color(0xFF3A3838),
                                 onSelected: (selected) => setState(() => _filterBy = 'all'),
                               ),
                               const SizedBox(width: 8),
                               FilterChip(
                                 label: const Text('Malicious'),
+                                labelStyle: TextStyle(
+                                  color: _filterBy == 'malicious' ? Colors.white : Colors.grey[400],
+                                ),
                                 selected: _filterBy == 'malicious',
+                                selectedColor: Colors.red.shade600,
+                                backgroundColor: Color(0xFF3A3838),
                                 onSelected: (selected) => setState(() => _filterBy = 'malicious'),
-                                selectedColor: Colors.red.shade100,
                               ),
                               const SizedBox(width: 8),
                               FilterChip(
                                 label: const Text('Benign'),
+                                labelStyle: TextStyle(
+                                  color: _filterBy == 'benign' ? Colors.white : Colors.grey[400],
+                                ),
                                 selected: _filterBy == 'benign',
+                                selectedColor: Colors.green.shade600,
+                                backgroundColor: Color(0xFF3A3838),
                                 onSelected: (selected) => setState(() => _filterBy = 'benign'),
-                                selectedColor: Colors.green.shade100,
                               ),
                             ],
                           ),
@@ -1660,20 +1779,20 @@ class _HistoryPageState extends State<HistoryPage> {
                                 Icon(
                                   _history.isEmpty ? Icons.history : Icons.search_off,
                                   size: 64,
-                                  color: Colors.grey,
+                                  color: Colors.grey[400],
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
                                   _history.isEmpty 
                                     ? 'No analysis history yet'
                                     : 'No results found',
-                                  style: const TextStyle(fontSize: 18, color: Colors.grey),
+                                  style: TextStyle(fontSize: 18, color: Colors.grey[400]),
                                 ),
                                 if (_history.isEmpty) ...[
                                   const SizedBox(height: 8),
-                                  const Text(
+                                  Text(
                                     'Start analyzing QR codes to see your history here',
-                                    style: TextStyle(color: Colors.grey),
+                                    style: TextStyle(color: Colors.grey[400]),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
@@ -1685,18 +1804,29 @@ class _HistoryPageState extends State<HistoryPage> {
                             itemCount: filteredItems.length,
                             itemBuilder: (context, index) {
                               final item = filteredItems[index];
-                              return Card(
+                              return Container(
                                 margin: const EdgeInsets.only(bottom: 12),
-                                elevation: 4,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF3A3838),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
                                 child: ListTile(
                                   contentPadding: const EdgeInsets.all(16),
                                   leading: Container(
                                     width: 60,
                                     height: 60,
                                     decoration: BoxDecoration(
-                                      color: item.result == "Malicious" ? Colors.red.shade100 : Colors.green.shade100,
-                                      borderRadius: BorderRadius.circular(8),
+                                      color: item.result == "Malicious" 
+                                        ? Colors.red.shade600.withOpacity(0.1) 
+                                        : Colors.green.shade600.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Icon(
                                       item.result == "Malicious" ? Icons.warning : Icons.check_circle,
@@ -1706,7 +1836,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                   ),
                                   title: Text(
                                     item.fileName,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1737,7 +1867,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                           Text(
                                             '${(item.confidence * 100).toStringAsFixed(1)}%',
                                             style: TextStyle(
-                                              color: Colors.grey.shade600,
+                                              color: Colors.grey[300],
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),
@@ -1748,13 +1878,14 @@ class _HistoryPageState extends State<HistoryPage> {
                                         '${item.timestamp.day}/${item.timestamp.month}/${item.timestamp.year} '
                                         '${item.timestamp.hour}:${item.timestamp.minute.toString().padLeft(2, '0')}',
                                         style: TextStyle(
-                                          color: Colors.grey.shade500,
+                                          color: Colors.grey[400],
                                           fontSize: 12,
                                         ),
                                       ),
                                     ],
                                   ),
                                   trailing: PopupMenuButton<String>(
+                                    color: Color(0xFF3A3838),
                                     onSelected: (value) {
                                       if (value == 'details') {
                                         _showHistoryDetails(item);
@@ -1763,17 +1894,17 @@ class _HistoryPageState extends State<HistoryPage> {
                                       }
                                     },
                                     itemBuilder: (context) => [
-                                      const PopupMenuItem(
+                                      PopupMenuItem(
                                         value: 'details',
                                         child: Row(
                                           children: [
-                                            Icon(Icons.info_outline),
+                                            Icon(Icons.info_outline, color: Color(0xFFFF8A00)),
                                             SizedBox(width: 8),
-                                            Text('View Details'),
+                                            Text('View Details', style: TextStyle(color: Colors.white)),
                                           ],
                                         ),
                                       ),
-                                      const PopupMenuItem(
+                                      PopupMenuItem(
                                         value: 'delete',
                                         child: Row(
                                           children: [
@@ -1807,16 +1938,12 @@ class AboutPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('About Us', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blue.shade600,
+        backgroundColor: Color(0xFFFF8A00),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.blue.shade50, Colors.white],
-          ),
+          color: Color(0xFF292727),
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -1824,71 +1951,133 @@ class AboutPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      height: 150,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              // Mission Section
+              Container(
+                padding: const EdgeInsets.all(24),
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Color(0xFF3A3838),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade600,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.qr_code_scanner,
-                        size: 50,
+                    const Text(
+                      'Our Mission',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Text(
-                      'QR Security Analyzer',
+                      'We provide advanced security analysis for QR codes using cutting-edge machine learning technology. Our goal is to protect users from malicious QR codes that could compromise their security and privacy.',
                       style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
+                        fontSize: 16, 
+                        height: 1.5,
+                        color: Colors.grey[300],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
-              const Text(
-                'Our Mission',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              
+              // Features Section
+              Container(
+                padding: const EdgeInsets.all(24),
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Color(0xFF3A3838),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Features',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildFeatureItem(Icons.security, 'AI-Powered Analysis', 'Advanced machine learning models detect malicious patterns'),
+                    _buildFeatureItem(Icons.speed, 'Real-time Processing', 'Instant analysis results with confidence scores'),
+                    _buildFeatureItem(Icons.history, 'Analysis History', 'Track and review your previous QR code scans'),
+                    _buildFeatureItem(Icons.camera_alt, 'Multiple Input Methods', 'Scan with camera or upload from gallery'),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'We provide advanced security analysis for QR codes using cutting-edge machine learning technology. Our goal is to protect users from malicious QR codes that could compromise their security and privacy.',
-                style: TextStyle(fontSize: 16, height: 1.5),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Features',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              
+              // Technology Section
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Color(0xFF3A3838),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              _buildFeatureItem(Icons.security, 'AI-Powered Analysis', 'Advanced machine learning models detect malicious patterns'),
-              _buildFeatureItem(Icons.speed, 'Real-time Processing', 'Instant analysis results with confidence scores'),
-              _buildFeatureItem(Icons.history, 'Analysis History', 'Track and review your previous QR code scans'),
-              _buildFeatureItem(Icons.camera_alt, 'Multiple Input Methods', 'Scan with camera or upload from gallery'),
-              const SizedBox(height: 24),
-              const Text(
-                'Technology',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Technology',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Built using TensorFlow Lite for efficient on-device machine learning inference, ensuring your data stays private and secure.',
+                      style: TextStyle(
+                        fontSize: 16, 
+                        height: 1.5,
+                        color: Colors.grey[300],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Built using TensorFlow Lite for efficient on-device machine learning inference, ensuring your data stays private and secure.',
-                style: TextStyle(fontSize: 16, height: 1.5),
               ),
             ],
           ),
@@ -1898,19 +2087,22 @@ class AboutPage extends StatelessWidget {
   }
 
   Widget _buildFeatureItem(IconData icon, String title, String description) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade100,
-              borderRadius: BorderRadius.circular(8),
+              color: Color(0xFFFF8A00).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: Colors.blue.shade600, size: 24),
+            child: Icon(
+              icon, 
+              color: Color(0xFFFF8A00), 
+              size: 24
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1921,7 +2113,8 @@ class AboutPage extends StatelessWidget {
                   title,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1929,7 +2122,7 @@ class AboutPage extends StatelessWidget {
                   description,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: Colors.grey[400],
                     height: 1.4,
                   ),
                 ),
@@ -1951,16 +2144,14 @@ class ContactPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Contact', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blue.shade600,
+        backgroundColor: Color(0xFFFF8A00),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Container(
+         width: double.infinity,
+        height: double.infinity,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.blue.shade50, Colors.white],
-          ),
+          color: Color(0xFF292727),
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -1972,6 +2163,7 @@ class ContactPage extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 8),
@@ -1979,7 +2171,7 @@ class ContactPage extends StatelessWidget {
                 'We\'d love to hear from you. Send us a message and we\'ll respond as soon as possible.',
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey[600],
+                  color: Colors.grey[300],
                   height: 1.5,
                 ),
               ),
@@ -1988,7 +2180,7 @@ class ContactPage extends StatelessWidget {
               _buildContactItem(
                 Icons.email,
                 'Email',
-                'support@qrsecurity.com',
+                'support@yourapp.com',
                 'Send us an email',
               ),
               
@@ -2002,106 +2194,11 @@ class ContactPage extends StatelessWidget {
               _buildContactItem(
                 Icons.location_on,
                 'Address',
-                '123 Security Street\nTech City, TC 12345',
+                '123 Tech Street\nTech City, TC 12345',
                 'Visit our office',
               ),
               
               const SizedBox(height: 32),
-              
-              // Contact Form
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.shade200,
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Send us a Message',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    TextField(
-                      decoration: InputDecoration(
-                        labelText: 'Name',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        prefixIcon: const Icon(Icons.person),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    TextField(
-                      decoration: InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        prefixIcon: const Icon(Icons.email),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    TextField(
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        labelText: 'Message',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        prefixIcon: const Icon(Icons.message),
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Handle form submission
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Message sent! We\'ll get back to you soon.'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.send, color: Colors.white),
-                        label: const Text(
-                          'Send Message',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade600,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
@@ -2111,31 +2208,30 @@ class ContactPage extends StatelessWidget {
 
   Widget _buildContactItem(IconData icon, String title, String content, String subtitle) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color(0xFF3A3838),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade100,
-              borderRadius: BorderRadius.circular(25),
+              color: Color(0xFFFF8A00).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               icon,
-              color: Colors.blue.shade600,
+              color: Color(0xFFFF8A00),
               size: 24,
             ),
           ),
@@ -2149,13 +2245,15 @@ class ContactPage extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   content,
-                  style: const TextStyle(
-                    fontSize: 15,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFFFF8A00),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -2163,8 +2261,8 @@ class ContactPage extends StatelessWidget {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
+                    fontSize: 12,
+                    color: Colors.grey[400],
                   ),
                 ),
               ],
@@ -2193,7 +2291,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Scan QR Code', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blue.shade600,
+        backgroundColor: Color(0xFFFF8A00),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           // Flash toggle
@@ -2339,7 +2437,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade600,
+                      color: Color(0xFFFF8A00),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Row(
