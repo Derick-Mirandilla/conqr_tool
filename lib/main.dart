@@ -1,7 +1,10 @@
 // File: lib/main.dart
 import 'dart:typed_data';
+import 'scanner.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:ui' as ui;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -422,7 +425,7 @@ class _MainAppPageState extends State<MainAppPage> {
 
       if (content == null) {
         setState(() {
-          _result = "Could not decode QR content";
+          _result = "Could not detect QR content";
           _isAnalyzing = false;
         });
         return;
@@ -439,31 +442,33 @@ class _MainAppPageState extends State<MainAppPage> {
       
       _interpreter.run(input, output);
       
-      final score = output[0][0];
-      final label = score >= 0.35 ? "Malicious" : "Benign";
+      final rawScore = output[0][0];
+      final label = rawScore >= 0.40 ? "Malicious" : "Benign";
+
+      final displayConfidence = label == "Benign" ? (1.0 - rawScore) : rawScore;
       
       // Store the decoded content and analysis results for potential opening
       _decodedContent = content;
       _analysisResult = label;
-      _analysisConfidence = score;
+      _analysisConfidence = displayConfidence;
       
       // Add to history
       await _addToHistory(
         _selectedImage?.path.split('/').last ?? 'Scanned QR',
         _selectedImage?.path ?? '',
         label,
-        score,
+        displayConfidence,
         content,
       );
       
       setState(() {
-        _result = "Analysis Complete!\nResult: $label\nConfidence: ${(score * 100).toStringAsFixed(1)}%";
+        _result = "Analysis Complete!\nResult: $label\nConfidence: ${(displayConfidence * 100).toStringAsFixed(1)}%";
         _isAnalyzing = false;
         _showContent = false; // Hide content by default
       });
 
       // Show post-analysis dialog
-      _showPostAnalysisDialog(label, score, content);
+      _showPostAnalysisDialog(label, displayConfidence, content);
     } catch (e) {
       setState(() {
         _result = "Error processing QR: $e";
@@ -2180,21 +2185,21 @@ class ContactPage extends StatelessWidget {
               _buildContactItem(
                 Icons.email,
                 'Email',
-                'support@yourapp.com',
+                'conqr2025@gmail.com',
                 'Send us an email',
               ),
               
               _buildContactItem(
                 Icons.phone,
                 'Phone',
-                '+1 (555) 123-4567',
+                '+63 912 345 6789',
                 'Call us during business hours',
               ),
               
               _buildContactItem(
                 Icons.location_on,
                 'Address',
-                '123 Tech Street\nTech City, TC 12345',
+                'Polytechnic University of the Philippines\nSta. Mesa, Manila, Philippines',
                 'Visit our office',
               ),
               
@@ -2274,351 +2279,126 @@ class ContactPage extends StatelessWidget {
   }
 }
 
-// QR Scanner Page (enhanced with better UI)
 class QRScannerPage extends StatefulWidget {
   @override
   State<QRScannerPage> createState() => _QRScannerPageState();
 }
 
 class _QRScannerPageState extends State<QRScannerPage> {
-  mobile.MobileScannerController cameraController = mobile.MobileScannerController();
-  bool _screenOpened = false;
-  bool _isFlashOn = false;
-  bool _isFrontCamera = false;
+  String? _scannedValue;
+  bool _showConfirmation = false;
+
+  Future<void> _startScan() async {
+    try {
+      final result = await GoogleCodeScanner.scanCode();
+      if (result != null) {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _scannedValue = result;
+          _showConfirmation = true;
+        });
+      }
+    } on PlatformException catch (e) {
+      print("Scan failed: $e");
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Start scan immediately when page opens
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startScan());
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan QR Code', style: TextStyle(color: Colors.white)),
-        backgroundColor: Color(0xFFFF8A00),
+        title:
+            const Text('Scan QR Code', style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFFFF8A00),
         iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          // Flash toggle
-          IconButton(
-            onPressed: () async {
-              await cameraController.toggleTorch();
-              setState(() {
-                _isFlashOn = !_isFlashOn;
-              });
-            },
-            icon: Icon(
-              _isFlashOn ? Icons.flash_on : Icons.flash_off,
-              color: Colors.white,
-            ),
-          ),
-          // Camera switch
-          IconButton(
-            onPressed: () async {
-              await cameraController.switchCamera();
-              setState(() {
-                _isFrontCamera = !_isFrontCamera;
-              });
-            },
-            icon: const Icon(
-              Icons.switch_camera,
-              color: Colors.white,
-            ),
-          ),
-        ],
       ),
       body: Stack(
         children: [
-          // Camera view
-          mobile.MobileScanner(
-            controller: cameraController,
-            onDetect: (capture) {
-              if (!_screenOpened) {
-                final List<mobile.Barcode> barcodes = capture.barcodes;
-                for (final barcode in barcodes) {
-                  if (barcode.rawValue != null) {
-                    _screenOpened = true;
-                    
-                    // Show success feedback
-                    HapticFeedback.lightImpact();
-                    
-                    // Return the scanned content
-                    Navigator.pop(context, barcode.rawValue);
-                    break;
-                  }
-                }
-              }
-            },
-          ),
-          
-          // Scanning overlay
-          Container(
-            decoration: ShapeDecoration(
-              shape: QrScannerOverlayShape(
-                borderColor: Colors.white,
-                borderRadius: 10,
-                borderLength: 30,
-                borderWidth: 5,
-                cutOutSize: MediaQuery.of(context).size.width * 0.7,
-              ),
-            ),
-          ),
-          
-          // Instructions overlay
-          Positioned(
-            bottom: 100,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.qr_code_scanner,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Position the QR code within the frame',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'The QR code will be scanned automatically',
-                    style: TextStyle(
-                      color: Colors.grey.shade300,
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Status indicators
-          Positioned(
-            top: 20,
-            left: 20,
-            right: 20,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Background / placeholder since Google scanner runs separately
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (_isFlashOn)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.yellow.shade600,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.flash_on, color: Colors.black, size: 16),
-                        SizedBox(width: 4),
-                        Text(
-                          'Flash On',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                const Spacer(),
-                if (_isFrontCamera)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Color(0xFFFF8A00),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.camera_front, color: Colors.white, size: 16),
-                        SizedBox(width: 4),
-                        Text(
-                          'Front Camera',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                const Icon(Icons.qr_code_scanner, size: 120, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  "Opening scanner...",
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
               ],
             ),
           ),
+
+          // Confirmation popup
+          if (_showConfirmation && _scannedValue != null)
+            Center(
+              child: Container(
+                margin: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.qr_code, color: Colors.white, size: 48),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "QR Code detected",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "QR Code detected. Do you want to analyze it?",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _showConfirmation = false;
+                              _scannedValue = null;
+                            });
+                            _startScan(); // restart scan
+                          },
+                          child: const Text("Cancel"),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFFF8A00),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context, _scannedValue); // still passes value back
+                          },
+                          child: const Text("Confirm"),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
-    );
-  }
-
-  @override
-  void dispose() {
-    cameraController.dispose();
-    super.dispose();
-  }
-}
-
-// QR Scanner Overlay Shape
-class QrScannerOverlayShape extends ShapeBorder {
-  const QrScannerOverlayShape({
-    this.borderColor = Colors.red,
-    this.borderWidth = 3.0,
-    this.overlayColor = const Color.fromRGBO(0, 0, 0, 80),
-    this.borderRadius = 0,
-    this.borderLength = 40,
-    double? cutOutSize,
-  }) : cutOutSize = cutOutSize ?? 250;
-
-  final Color overlayColor;
-  final Color borderColor;
-  final double borderWidth;
-  final double borderRadius;
-  final double borderLength;
-  final double cutOutSize;
-
-  @override
-  EdgeInsetsGeometry get dimensions => const EdgeInsets.all(10);
-
-  @override
-  Path getInnerPath(Rect rect, {TextDirection? textDirection}) {
-    return Path()
-      ..fillType = PathFillType.evenOdd
-      ..addPath(getOuterPath(rect), Offset.zero);
-  }
-
-  @override
-  Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
-    Path _getLeftTopPath(Rect rect) {
-      return Path()
-        ..moveTo(rect.left, rect.bottom)
-        ..lineTo(rect.left, rect.top + borderRadius)
-        ..quadraticBezierTo(rect.left, rect.top, rect.left + borderRadius, rect.top)
-        ..lineTo(rect.right, rect.top);
-    }
-
-    return _getLeftTopPath(rect)
-      ..lineTo(rect.right, rect.bottom)
-      ..lineTo(rect.left, rect.bottom)
-      ..lineTo(rect.left, rect.top);
-  }
-
-  @override
-  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
-    final width = rect.width;
-    final height = rect.height;
-    final borderOffset = borderWidth / 2;
-    final _cutOutSize = cutOutSize < width && cutOutSize < height 
-        ? cutOutSize 
-        : (width < height ? width : height) - borderOffset * 2;
-    final _cutOutRadius = borderRadius + borderOffset;
-
-    final cutOutRect = Rect.fromLTWH(
-      rect.left + width / 2 - _cutOutSize / 2 + borderOffset,
-      rect.top + height / 2 - _cutOutSize / 2 + borderOffset,
-      _cutOutSize - borderOffset * 2,
-      _cutOutSize - borderOffset * 2,
-    );
-
-    final cutOutRRect = RRect.fromRectAndRadius(
-      cutOutRect,
-      Radius.circular(_cutOutRadius),
-    );
-
-    final overlayPaint = Paint()
-      ..color = overlayColor;
-
-    final borderPaint = Paint()
-      ..color = borderColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = borderWidth;
-
-    // Fixed: Create the overlay with a hole in the middle
-    final overlayPath = Path()
-      ..addRect(rect)  // Add the full rectangle
-      ..addRRect(cutOutRRect)  // Add the cutout area
-      ..fillType = PathFillType.evenOdd;  // This creates the hole
-
-    // Draw the overlay with the hole
-    canvas.drawPath(overlayPath, overlayPaint);
-
-    // Draw border corners
-    final cornerRadius = _cutOutRadius;
-    final cornerPath = Path();
-
-    // Top Left
-    cornerPath.moveTo(cutOutRect.left - borderOffset, cutOutRect.top + cornerRadius);
-    cornerPath.quadraticBezierTo(
-      cutOutRect.left - borderOffset, 
-      cutOutRect.top - borderOffset, 
-      cutOutRect.left + cornerRadius, 
-      cutOutRect.top - borderOffset
-    );
-    cornerPath.lineTo(cutOutRect.left + borderLength, cutOutRect.top - borderOffset);
-
-    cornerPath.moveTo(cutOutRect.left - borderOffset, cutOutRect.top + borderLength);
-    cornerPath.lineTo(cutOutRect.left - borderOffset, cutOutRect.top + cornerRadius);
-
-    // Top Right
-    cornerPath.moveTo(cutOutRect.right + borderOffset, cutOutRect.top + cornerRadius);
-    cornerPath.quadraticBezierTo(
-      cutOutRect.right + borderOffset, 
-      cutOutRect.top - borderOffset, 
-      cutOutRect.right - cornerRadius, 
-      cutOutRect.top - borderOffset
-    );
-    cornerPath.lineTo(cutOutRect.right - borderLength, cutOutRect.top - borderOffset);
-
-    cornerPath.moveTo(cutOutRect.right + borderOffset, cutOutRect.top + borderLength);
-    cornerPath.lineTo(cutOutRect.right + borderOffset, cutOutRect.top + cornerRadius);
-
-    // Bottom Left
-    cornerPath.moveTo(cutOutRect.left - borderOffset, cutOutRect.bottom - cornerRadius);
-    cornerPath.quadraticBezierTo(
-      cutOutRect.left - borderOffset, 
-      cutOutRect.bottom + borderOffset, 
-      cutOutRect.left + cornerRadius, 
-      cutOutRect.bottom + borderOffset
-    );
-    cornerPath.lineTo(cutOutRect.left + borderLength, cutOutRect.bottom + borderOffset);
-
-    cornerPath.moveTo(cutOutRect.left - borderOffset, cutOutRect.bottom - borderLength);
-    cornerPath.lineTo(cutOutRect.left - borderOffset, cutOutRect.bottom - cornerRadius);
-
-    // Bottom Right
-    cornerPath.moveTo(cutOutRect.right + borderOffset, cutOutRect.bottom - cornerRadius);
-    cornerPath.quadraticBezierTo(
-      cutOutRect.right + borderOffset, 
-      cutOutRect.bottom + borderOffset, 
-      cutOutRect.right - cornerRadius, 
-      cutOutRect.bottom + borderOffset
-    );
-    cornerPath.lineTo(cutOutRect.right - borderLength, cutOutRect.bottom + borderOffset);
-
-    cornerPath.moveTo(cutOutRect.right + borderOffset, cutOutRect.bottom - borderLength);
-    cornerPath.lineTo(cutOutRect.right + borderOffset, cutOutRect.bottom - cornerRadius);
-
-    canvas.drawPath(cornerPath, borderPaint);
-  }
-
-  @override
-  ShapeBorder scale(double t) {
-    return QrScannerOverlayShape(
-      borderColor: borderColor,
-      borderWidth: borderWidth,
-      overlayColor: overlayColor,
     );
   }
 }

@@ -24,7 +24,7 @@ dependencies:
   # UI
   cupertino_icons: ^1.0.6
 
-  mobile_scanner: ^3.5.6 
+  mobile_scanner: ^7.1.2 
   camera: ^0.10.5+5  # Alternative camera package
   permission_handler: ^11.3.0 
   qr_flutter: ^4.1.0
@@ -34,7 +34,7 @@ dependencies:
   qr_code_tools: ^0.2.0
   shared_preferences: ^2.0.15
   url_launcher: ^6.2.1
-  
+
   
 
 dev_dependencies:
