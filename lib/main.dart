@@ -16,6 +16,7 @@ import 'package:qr/qr.dart';
 import 'package:qr_code_tools/qr_code_tools.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 
 void main() {
   runApp(const QRSecurityApp());
@@ -412,43 +413,104 @@ class _MainAppPageState extends State<MainAppPage> {
     setState(() => _isAnalyzing = true);
 
     try {
-      String? content;
+      img.Image qrImage;
+      String? decodedContent;
+      bool usedDirectAnalysis = false;
       
       if (_selectedImage != null) {
-        content = await _decodeQRFromImage(_selectedImage!);
-      } else if (_qrContent != null) {
-        content = _qrContent;
+        // ========== PATH A: GALLERY/FILE UPLOAD ==========
+        final bytes = await _selectedImage!.readAsBytes();
+        var loadedImage = img.decodeImage(bytes);
+        
+        if (loadedImage == null) {
+          setState(() {
+            _result = "Failed to load image";
+            _isAnalyzing = false;
+          });
+          return;
+        }
+        
+        if (loadedImage.width == 69 && loadedImage.height == 69) {
+        // DEMO MODE: Use image as-is (already in correct format)
+        qrImage = loadedImage;  
+        usedDirectAnalysis = true;
+        
+        decodedContent = await _decodeQRFromImage(_selectedImage!);
       } else {
-        setState(() => _result = "No QR code to process");
-        return;
-      }
-
-      if (content == null) {
+          // ===== REAL-WORLD MODE: Extract & preprocess =====
+          debugPrint("🌍 REAL-WORLD: ${loadedImage.width}×${loadedImage.height} image");
+          
+          // Step 1: Extract QR region
+          var extractedQR = await _extractQRFromImage(_selectedImage!);
+          
+          if (extractedQR == null) {
+            setState(() {
+              _result = "⚠️ Could not detect QR code in image.\n\n"
+                  "Tips:\n"
+                  "• Ensure QR is clearly visible\n"
+                  "• Avoid glare or shadows\n"
+                  "• Use a clear, focused image\n"
+                  "• Or try camera scan instead";
+              _isAnalyzing = false;
+            });
+            return;
+          }
+          
+          debugPrint("✂️  Extracted: ${extractedQR.width}×${extractedQR.height}");
+          
+          // Step 2: Grayscale
+          qrImage = img.grayscale(extractedQR);
+          
+          // Step 3: Binarize (pure black/white)
+          qrImage = _binarizeImage(qrImage);
+          
+          // Step 4: Resize to 69×69
+          qrImage = img.copyResize(
+            qrImage, 
+            width: 69, 
+            height: 69,
+            interpolation: img.Interpolation.nearest // Preserves QR structure
+          );
+          
+          debugPrint("📐 Final: ${qrImage.width}×${qrImage.height}");
+          
+          // Decode for display
+          decodedContent = await _decodeQRFromImage(_selectedImage!);
+        }
+        
+      } else if (_qrContent != null) {
+        // ========== PATH B: CAMERA SCAN ==========
+        debugPrint("📷 CAMERA MODE: Regenerating from content");
+        qrImage = _generateStandardQR(_qrContent!);
+        decodedContent = _qrContent;
+        
+      } else {
         setState(() {
-          _result = "Could not detect QR content";
+          _result = "No QR code to process";
           _isAnalyzing = false;
         });
         return;
       }
 
-      final regeneratedQR = _generateStandardQR(content);
-      
+      // Store processed image for display
       setState(() {
-        _regeneratedQRImage = regeneratedQR;
+        _regeneratedQRImage = qrImage;
       });
 
-      final input = _preprocessImage(regeneratedQR);
+      // ========== RUN ML INFERENCE ==========
+      final input = _preprocessImage(qrImage);
       final output = List.generate(1, (_) => List.filled(1, 0.0));
       
       _interpreter.run(input, output);
       
       final rawScore = output[0][0];
       final label = rawScore >= 0.40 ? "Malicious" : "Benign";
-
       final displayConfidence = label == "Benign" ? (1.0 - rawScore) : rawScore;
       
-      // Store the decoded content and analysis results for potential opening
-      _decodedContent = content;
+      debugPrint("🎯 Result: $label (${(displayConfidence * 100).toStringAsFixed(1)}%)");
+      
+      // Store results
+      _decodedContent = decodedContent;
       _analysisResult = label;
       _analysisConfidence = displayConfidence;
       
@@ -458,18 +520,29 @@ class _MainAppPageState extends State<MainAppPage> {
         _selectedImage?.path ?? '',
         label,
         displayConfidence,
-        content,
+        decodedContent,
       );
       
+      // Update UI
       setState(() {
-        _result = "Analysis Complete!\nResult: $label\nConfidence: ${(displayConfidence * 100).toStringAsFixed(1)}%";
+        String modeInfo = usedDirectAnalysis ? "\n" : "";
+        _result = "✅ Analysis Complete!\n"
+            "Result: $label\n"
+            "Confidence: ${(displayConfidence * 100).toStringAsFixed(1)}%$modeInfo";
         _isAnalyzing = false;
-        _showContent = false; // Hide content by default
+        _showContent = false;
       });
 
-      // Show post-analysis dialog
-      _showPostAnalysisDialog(label, displayConfidence, content);
-    } catch (e) {
+      // Show detailed results
+      if (decodedContent != null && decodedContent.isNotEmpty) {
+        _showPostAnalysisDialog(label, displayConfidence, decodedContent);
+      } else {
+        _showPostAnalysisDialog(label, displayConfidence, "Content not available");
+      }
+      
+    } catch (e, stackTrace) {
+      debugPrint("❌ Error: $e");
+      debugPrint("Stack: $stackTrace");
       setState(() {
         _result = "Error processing QR: $e";
         _isAnalyzing = false;
@@ -1076,30 +1149,12 @@ Widget build(BuildContext context) {
                 children: [
                   Container(
                     padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.qr_code_scanner,
-                      size: 40,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'QR Code Analyzer',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'Smart Analysis Tool',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 14,
+                    child: ClipRRect(
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        height: 120,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ],
@@ -2401,4 +2456,93 @@ class _QRScannerPageState extends State<QRScannerPage> {
       ),
     );
   }
+}
+
+Future<img.Image?> _extractQRFromImage(File imageFile) async {
+  BarcodeScanner? barcodeScanner;
+  
+  try {
+    final bytes = await imageFile.readAsBytes();
+    final image = img.decodeImage(bytes);
+    
+    if (image == null) {
+      debugPrint("Failed to decode image");
+      return null;
+    }
+    
+    // Use ML Kit to detect QR code boundaries
+    final inputImage = InputImage.fromFile(imageFile);
+    barcodeScanner = BarcodeScanner(
+      formats: [BarcodeFormat.qrCode]
+    );
+    
+    final List<Barcode> barcodes = await barcodeScanner.processImage(inputImage);
+    
+    if (barcodes.isEmpty) {
+      debugPrint("No QR code detected in image");
+      return null;
+    }
+    
+    // Get the first QR code's bounding box
+    final barcode = barcodes.first;
+    final boundingBox = barcode.boundingBox;
+    
+    if (boundingBox == null) {
+      debugPrint("QR detected but no bounding box");
+      return null;
+    }
+    
+    // Add 5% padding to ensure we capture the whole QR
+    const padding = 0.05;
+    final paddingX = (boundingBox.width * padding).toInt();
+    final paddingY = (boundingBox.height * padding).toInt();
+    
+    // Convert to double, perform calculation, then clamp and convert to int
+    final cropX = (boundingBox.left.toDouble() - paddingX)
+        .clamp(0.0, (image.width - 1).toDouble())
+        .toInt();
+    final cropY = (boundingBox.top.toDouble() - paddingY)
+        .clamp(0.0, (image.height - 1).toDouble())
+        .toInt();
+    final cropWidth = (boundingBox.width + paddingX * 2)
+        .clamp(1, image.width - cropX)
+        .toInt();
+    final cropHeight = (boundingBox.height + paddingY * 2)
+        .clamp(1, image.height - cropY)
+        .toInt();
+    
+    // Crop to QR region
+    final croppedImage = img.copyCrop(image,
+      x: cropX,
+      y: cropY,
+      width: cropWidth,
+      height: cropHeight,
+    );
+    
+    debugPrint("QR extracted: ${croppedImage.width}x${croppedImage.height}");
+    return croppedImage;
+    
+  } catch (e) {
+    debugPrint("QR extraction error: $e");
+    return null;
+  } finally {
+    await barcodeScanner?.close();
+  }
+}
+
+/// Convert image to pure black and white (binarization)
+img.Image _binarizeImage(img.Image image) {
+  const threshold = 128;
+  final binarized = image.clone();
+  
+  for (int y = 0; y < binarized.height; y++) {
+    for (int x = 0; x < binarized.width; x++) {
+      final pixel = binarized.getPixel(x, y);
+      final gray = pixel.r.toInt(); // Already grayscale
+      final binary = gray > threshold ? 255 : 0;
+      binarized.setPixel(x, y, img.ColorRgb8(binary, binary, binary));
+    }
+  }
+  
+  return binarized;
 }
