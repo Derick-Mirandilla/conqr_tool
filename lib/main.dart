@@ -17,6 +17,7 @@ import 'package:qr_code_tools/qr_code_tools.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
+import 'batch_testing_page.dart';
 
 void main() {
   runApp(const QRSecurityApp());
@@ -40,6 +41,7 @@ class QRSecurityApp extends StatelessWidget {
         '/about': (context) => const AboutPage(),
         '/history': (context) => const HistoryPage(),
         '/contact': (context) => const ContactPage(),
+        '/batch-testing': (context) => const BatchTestingPage(),
       },
     );
   }
@@ -1180,6 +1182,13 @@ Widget build(BuildContext context) {
               title: 'Contact',
               route: '/contact',
               description: 'Get in touch with us',
+            ),
+            _buildDrawerItem(
+              context,
+              icon: Icons.analytics,
+              title: 'Batch Testing',
+              route: '/batch-testing',
+              description: 'Test multiple QR codes',
             ),
           ],
         ),
