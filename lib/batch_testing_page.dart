@@ -39,7 +39,7 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
 
   Future<void> _loadModel() async {
     try {
-      _interpreter = await Interpreter.fromAsset('assets/models/model.tflite');
+      _interpreter = await Interpreter.fromAsset('assets/models/model_weighted.tflite');
       setState(() {
         _isInitialized = true;
       });
@@ -123,8 +123,6 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
 
 
   List<List<List<List<double>>>> _preprocessImage(img.Image image) {
-    // Images are already 69x69 grayscale from the exported test set
-    // Just normalize pixel values from [0, 255] to [0, 1]
     
     final input = List.generate(1, (_) => 
       List.generate(69, (y) => 
@@ -189,7 +187,7 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
           final prob = output[0][0];
           yTrue.add(0);
           yProbs.add(prob);
-          yPred.add(prob >= 0.4 ? 1 : 0);
+          yPred.add(prob >= 0.5 ? 1 : 0);
           benignProbs.add(prob);
           
           setState(() => _processedCount++);
@@ -209,7 +207,7 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
             continue;
           }
           
-          // Don't use img.grayscale() - convert manually during preprocessing
+
           final input = _preprocessImage(image);
           final output = List.generate(1, (_) => List.filled(1, 0.0));
           _interpreter.run(input, output);
@@ -217,7 +215,7 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
           final prob = output[0][0];
           yTrue.add(1);
           yProbs.add(prob);
-          yPred.add(prob >= 0.4 ? 1 : 0);
+          yPred.add(prob >= 0.5 ? 1 : 0);
           maliciousProbs.add(prob);
           
           setState(() => _processedCount++);

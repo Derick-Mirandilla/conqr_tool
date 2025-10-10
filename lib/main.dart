@@ -3,21 +3,136 @@ import 'dart:typed_data';
 import 'scanner.dart';
 import 'dart:io';
 import 'dart:convert';
-import 'dart:ui' as ui;
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:mobile_scanner/mobile_scanner.dart' as mobile;
 import 'package:qr/qr.dart'; 
 import 'package:qr_code_tools/qr_code_tools.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'batch_testing_page.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+
+class QRVersionChecker {
+  InAppWebViewController? _webViewController;
+  bool _isReady = false;
+  Function(QRVersionMetadata?)? _onResult;
+  
+  Future<void> initialize(InAppWebViewController controller) async {
+    _webViewController = controller;
+    // Wait for WebView to be fully loaded
+    await Future.delayed(Duration(milliseconds: 1000));
+    _isReady = true;
+  }
+
+  Future<QRVersionMetadata?> checkVersion(File imageFile) async {
+    if (!_isReady || _webViewController == null) {
+      debugPrint('⚠️ Version checker not ready');
+      return null;
+    }
+
+    try {
+      final bytes = await imageFile.readAsBytes();
+      final base64Image = base64Encode(bytes);
+      
+      debugPrint('📤 Sending image to JS decoder...');
+      
+      // Call JavaScript function
+      await _webViewController!.evaluateJavascript(source: '''
+        (function() {
+          try {
+            decodeQRForVersion('$base64Image');
+            return 'sent';
+          } catch(e) {
+            return 'error: ' + e.message;
+          }
+        })();
+      ''');
+      
+      debugPrint('✅ Image sent to decoder');
+      
+      // Note: Actual result comes through the handler callback
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error checking QR version: $e');
+      return null;
+    }
+  }
+
+  void setResultCallback(Function(QRVersionMetadata?) callback) {
+    _onResult = callback;
+  }
+
+  bool get isReady => _isReady;
+}
+
+class QRVersionMetadata {
+  final int version;
+  final String errorCorrection;
+  final int moduleCount;
+  final String matrixSize;
+  final String? data;
+  final Map<String, dynamic>? location;
+
+  QRVersionMetadata({
+    required this.version,
+    required this.errorCorrection,
+    required this.moduleCount,
+    required this.matrixSize,
+    this.data,
+    this.location,
+  });
+
+  factory QRVersionMetadata.fromJson(Map<String, dynamic> json) {
+    return QRVersionMetadata(
+      version: json['version'] ?? 0,
+      errorCorrection: json['errorCorrection'] ?? 'Unknown',
+      moduleCount: json['moduleCount'] ?? 0,
+      matrixSize: json['matrixSize'] ?? '0x0',
+      data: json['data'],
+      location: json['location'],
+    );
+  }
+
+  bool isVersion13() => version == 13;
+  
+  List<Map<String, double>>? get corners {
+    if (location == null) return null;
+    try {
+      // Extract corners from location object
+      final topLeft = location!['topLeftCorner'];
+      final topRight = location!['topRightCorner'];
+      final bottomRight = location!['bottomRightCorner'];
+      final bottomLeft = location!['bottomLeftCorner'];
+      
+      if (topLeft == null || topRight == null || bottomRight == null || bottomLeft == null) {
+        return null;
+      }
+      
+      return [
+        {'x': (topLeft['x'] as num).toDouble(), 
+         'y': (topLeft['y'] as num).toDouble()},
+        {'x': (topRight['x'] as num).toDouble(), 
+         'y': (topRight['y'] as num).toDouble()},
+        {'x': (bottomRight['x'] as num).toDouble(), 
+         'y': (bottomRight['y'] as num).toDouble()},
+        {'x': (bottomLeft['x'] as num).toDouble(), 
+         'y': (bottomLeft['y'] as num).toDouble()},
+      ];
+    } catch (e) {
+      debugPrint('❌ Error parsing corners: $e');
+      return null;
+    }
+  }
+  
+  @override
+  String toString() {
+    return 'QR v$version ($matrixSize) - EC: $errorCorrection';
+  }
+}
 
 void main() {
   runApp(const QRSecurityApp());
@@ -146,7 +261,7 @@ class LandingPage extends StatelessWidget {
   }
 }
 
-// History Data Model - Fixed JSON handling
+// History Data Model 
 class QRAnalysisHistory {
   final String id;
   final String fileName;
@@ -177,7 +292,7 @@ class QRAnalysisHistory {
     'content': content,
   };
 
-  // Fixed JSON deserialization with error handling
+
   factory QRAnalysisHistory.fromJson(Map<String, dynamic> json) {
     try {
       return QRAnalysisHistory(
@@ -226,15 +341,19 @@ class _MainAppPageState extends State<MainAppPage> {
   List<QRAnalysisHistory> _history = [];
   bool _isAnalyzing = false;
   bool _showContent = false;
+  QRVersionChecker? _versionChecker;
+  QRVersionMetadata? _qrVersionMetadata;
+  bool _webViewReady = false;
 
   @override
   void initState() {
     super.initState();
     _loadModel();
     _loadHistory();
+    _versionChecker = QRVersionChecker();
   }
 
-  // Fixed history loading with proper JSON handling
+
   Future<void> _loadHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -261,7 +380,7 @@ class _MainAppPageState extends State<MainAppPage> {
     }
   }
 
-  // Fixed history saving with proper JSON handling
+
   Future<void> _saveHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -295,7 +414,7 @@ class _MainAppPageState extends State<MainAppPage> {
       
       setState(() {
         _history.insert(0, history);
-        if (_history.length > 50) { // Keep only last 50 records
+        if (_history.length > 50) { 
           _history = _history.take(50).toList();
         }
       });
@@ -311,14 +430,115 @@ class _MainAppPageState extends State<MainAppPage> {
 
   Future<void> _loadModel() async {
     try {
-      _interpreter = await Interpreter.fromAsset('assets/models/model.tflite');
+      _interpreter = await Interpreter.fromAsset('assets/models/model_weighted.tflite');
       setState(() => _isInitialized = true);
     } catch (e) {
       setState(() => _result = "Error loading model: $e");
     }
   }
 
-  List<List<List<List<double>>>> _preprocessImage(img.Image image) {
+  String _getVersionCheckerHtml() {
+    return '''
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  </head>
+  <body>
+      <canvas id="canvas" style="display:none;"></canvas>
+      
+      <script>
+          console.log('✅ QR Version Checker JS loaded');
+          
+          const canvas = document.getElementById('canvas');
+          const ctx = canvas.getContext('2d');
+
+          function decodeQRForVersion(base64Data) {
+              console.log('🔍 Decoding QR for version...');
+              
+              const img = new Image();
+              
+              img.onload = function() {
+                  console.log('📷 Image loaded:', img.width, 'x', img.height);
+                  
+                  canvas.width = img.width;
+                  canvas.height = img.height;
+                  ctx.drawImage(img, 0, 0);
+                  
+                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  const code = jsQR(imageData.data, imageData.width, imageData.height);
+                  
+                  if (code) {
+                      const moduleCount = (code.version - 1) * 4 + 21;
+                      
+                      // ✅ FIXED: Properly extract corner coordinates from jsQR location object
+                      const result = {
+                          version: code.version,
+                          errorCorrection: code.errorCorrectionLevel || 'L',
+                          data: code.data,
+                          matrixSize: moduleCount + 'x' + moduleCount,
+                          moduleCount: moduleCount * moduleCount,
+                          location: {
+                              topLeftCorner: {
+                                  x: code.location.topLeftCorner.x,
+                                  y: code.location.topLeftCorner.y
+                              },
+                              topRightCorner: {
+                                  x: code.location.topRightCorner.x,
+                                  y: code.location.topRightCorner.y
+                              },
+                              bottomRightCorner: {
+                                  x: code.location.bottomRightCorner.x,
+                                  y: code.location.bottomRightCorner.y
+                              },
+                              bottomLeftCorner: {
+                                  x: code.location.bottomLeftCorner.x,
+                                  y: code.location.bottomLeftCorner.y
+                              }
+                          }
+                      };
+                      
+                      console.log('✅ QR Decoded:', result);
+                      console.log('📍 Corners:', result.location);
+                      
+                      // Send result to Flutter
+                      if (window.flutter_inappwebview) {
+                          window.flutter_inappwebview.callHandler('QRVersionResult', result);
+                      } else {
+                          console.error('❌ Flutter bridge not available');
+                      }
+                  } else {
+                      console.warn('⚠️ No QR code detected');
+                      if (window.flutter_inappwebview) {
+                          window.flutter_inappwebview.callHandler('QRVersionError', 'No QR code detected');
+                      }
+                  }
+              };
+              
+              img.onerror = function(e) {
+                  console.error('❌ Failed to load image:', e);
+                  if (window.flutter_inappwebview) {
+                      window.flutter_inappwebview.callHandler('QRVersionError', 'Failed to load image');
+                  }
+              };
+              
+              img.src = 'data:image/png;base64,' + base64Data;
+          }
+          
+          // Test function
+          window.testChecker = function() {
+              console.log('🧪 Version checker is active');
+              return 'OK';
+          };
+      </script>
+  </body>
+  </html>
+    ''';
+  }
+
+   List<List<List<List<double>>>> _preprocessImage(img.Image image) {
     final resized = img.copyResize(image, width: 69, height: 69);
     final input = List.generate(
         1,
@@ -331,11 +551,14 @@ class _MainAppPageState extends State<MainAppPage> {
   }
 
   img.Image _generateStandardQR(String content) {
+    // Version 13, Error Correction Level L
     final qrCode = QrCode(13, QrErrorCorrectLevel.L)..addData(content);
     final qrImageData = QrImage(qrCode);
 
-    final moduleCount = qrImageData.moduleCount;
-    final qrImage = img.Image(width: moduleCount, height: moduleCount);
+    final moduleCount = qrImageData.moduleCount; 
+    
+    final qrImage = img.Image(width: moduleCount, height: moduleCount); 
+    
     img.fill(qrImage, color: img.ColorRgb8(255, 255, 255));
 
     for (int y = 0; y < moduleCount; y++) {
@@ -346,7 +569,7 @@ class _MainAppPageState extends State<MainAppPage> {
       }
     }
 
-    return img.copyResize(qrImage, width: 69, height: 69);
+    return qrImage;
   }
 
   Future<void> _pickImageFromGallery() async {
@@ -406,6 +629,7 @@ class _MainAppPageState extends State<MainAppPage> {
     }
   }
 
+
   Future<void> _processQRCode() async {
     if (!_isInitialized) {
       setState(() => _result = "Model not initialized yet");
@@ -415,7 +639,7 @@ class _MainAppPageState extends State<MainAppPage> {
     setState(() => _isAnalyzing = true);
 
     try {
-      img.Image qrImage;
+      img.Image? qrImage; // Make it nullable
       String? decodedContent;
       bool usedDirectAnalysis = false;
       
@@ -432,49 +656,86 @@ class _MainAppPageState extends State<MainAppPage> {
           return;
         }
         
+        // ✅ CHECK IF IMAGE IS EXACTLY 69x69
         if (loadedImage.width == 69 && loadedImage.height == 69) {
-        // DEMO MODE: Use image as-is (already in correct format)
-        qrImage = loadedImage;  
-        usedDirectAnalysis = true;
-        
-        decodedContent = await _decodeQRFromImage(_selectedImage!);
-      } else {
-          // ===== REAL-WORLD MODE: Extract & preprocess =====
-          debugPrint("🌍 REAL-WORLD: ${loadedImage.width}×${loadedImage.height} image");
+          // ✅ PERFECT 69x69 - Use directly, skip version checking
+          debugPrint("✅ Perfect 69x69 image detected - skipping version check, using directly");
+          qrImage = loadedImage;
+          usedDirectAnalysis = true;
           
-          // Step 1: Extract QR region
-          var extractedQR = await _extractQRFromImage(_selectedImage!);
+          // Decode the QR content
+          decodedContent = await _decodeQRFromImage(_selectedImage!);
           
-          if (extractedQR == null) {
+        } else {
+          // 🆕 CHECK QR VERSION (only for non-69x69 images that need processing)
+          if (_versionChecker?.isReady == true) {
+            debugPrint('🔍 Checking QR version for real-world image...');
+            await _versionChecker!.checkVersion(_selectedImage!);
+            // Wait for result
+            await Future.delayed(Duration(milliseconds: 500));
+            
+            if (_qrVersionMetadata != null) {
+              debugPrint('📊 QR Metadata: ${_qrVersionMetadata.toString()}');
+              
+              // ⚠️ VERSION VALIDATION
+              if (!_qrVersionMetadata!.isVersion13()) {
+                setState(() {
+                  _result = "Unsupported QR Version";
+                  _isAnalyzing = false;
+                  // Clear previous analysis results
+                  _decodedContent = null;
+                  _analysisResult = null;
+                  _analysisConfidence = null;
+                  _regeneratedQRImage = null;
+                });
+                
+                _showVersionWarningDialog(_qrVersionMetadata!.version);
+                return; // Stop processing
+              }
+              
+              debugPrint('✅ Version 13 confirmed - proceeding with analysis');
+            } else {
+              debugPrint('⚠️ Could not detect QR version - proceeding anyway');
+            }
+          }
+          
+          // ===== REAL-WORLD MODE: Requires cropping & processing =====
+          debugPrint("🌍 REAL-WORLD: ${loadedImage.width}×${loadedImage.height} image - processing required");
+          
+          if (_qrVersionMetadata?.corners != null) {
+            debugPrint("✂️ Using corner-based cropping");
+            final extractedQR = _cropQRUsingCorners(loadedImage, _qrVersionMetadata!.corners!);
+            
+            if (extractedQR != null) {
+              qrImage = extractedQR;
+              debugPrint("📐 Cropped QR: ${qrImage.width}×${qrImage.height}");
+            } else {
+              setState(() {
+                _result = "⚠️ Failed to crop QR code region.\n\nPlease try again with a clearer image.";
+                _isAnalyzing = false;
+                _decodedContent = null;
+                _analysisResult = null;
+                _analysisConfidence = null;
+                _regeneratedQRImage = null;
+              });
+              return;
+            }
+          } else {
             setState(() {
-              _result = "⚠️ Could not detect QR code in image.\n\n"
+              _result = "⚠️ Could not detect QR code boundaries.\n\n"
                   "Tips:\n"
-                  "• Ensure QR is clearly visible\n"
+                  "• Ensure QR code is fully visible\n"
                   "• Avoid glare or shadows\n"
                   "• Use a clear, focused image\n"
-                  "• Or try camera scan instead";
+                  "• Try scanning with camera instead";
               _isAnalyzing = false;
+              _decodedContent = null;
+              _analysisResult = null;
+              _analysisConfidence = null;
+              _regeneratedQRImage = null;
             });
             return;
           }
-          
-          debugPrint("✂️  Extracted: ${extractedQR.width}×${extractedQR.height}");
-          
-          // Step 2: Grayscale
-          qrImage = img.grayscale(extractedQR);
-          
-          // Step 3: Binarize (pure black/white)
-          qrImage = _binarizeImage(qrImage);
-          
-          // Step 4: Resize to 69×69
-          qrImage = img.copyResize(
-            qrImage, 
-            width: 69, 
-            height: 69,
-            interpolation: img.Interpolation.nearest // Preserves QR structure
-          );
-          
-          debugPrint("📐 Final: ${qrImage.width}×${qrImage.height}");
           
           // Decode for display
           decodedContent = await _decodeQRFromImage(_selectedImage!);
@@ -495,19 +756,30 @@ class _MainAppPageState extends State<MainAppPage> {
       }
 
       // Store processed image for display
-      setState(() {
-        _regeneratedQRImage = qrImage;
-      });
+      if (qrImage != null) {
+        setState(() {
+          _regeneratedQRImage = qrImage;
+        });
+      }
 
       // ========== RUN ML INFERENCE ==========
+      if (qrImage == null) {
+        setState(() {
+          _result = "Failed to process QR code";
+          _isAnalyzing = false;
+        });
+        return;
+      }
+      
+      // ✅ Preprocess image (will resize if needed)
       final input = _preprocessImage(qrImage);
       final output = List.generate(1, (_) => List.filled(1, 0.0));
       
       _interpreter.run(input, output);
       
       final rawScore = output[0][0];
-      final label = rawScore >= 0.40 ? "Malicious" : "Benign";
-      final displayConfidence = label == "Benign" ? (1.0 - rawScore) : rawScore;
+      final label = rawScore >= 0.50 ? "Malicious" : "Safe";
+      final displayConfidence = label == "Safe" ? (1.0 - rawScore) : rawScore;
       
       debugPrint("🎯 Result: $label (${(displayConfidence * 100).toStringAsFixed(1)}%)");
       
@@ -552,13 +824,197 @@ class _MainAppPageState extends State<MainAppPage> {
     }
   }
 
+
+  img.Image? _cropQRUsingCorners(img.Image sourceImage, List<Map<String, double>> corners) {
+    try {
+      debugPrint('📍 Input corners: $corners');
+      
+      // Validate corners
+      if (corners.length != 4) {
+        debugPrint('❌ Invalid corners count: ${corners.length}');
+        return null;
+      }
+      
+      // Extract coordinates
+      final topLeft = corners[0];
+      final topRight = corners[1];
+      final bottomRight = corners[2];
+      final bottomLeft = corners[3];
+      
+      // Validate each corner has x and y
+      if (!topLeft.containsKey('x') || !topLeft.containsKey('y') ||
+          !topRight.containsKey('x') || !topRight.containsKey('y') ||
+          !bottomRight.containsKey('x') || !bottomRight.containsKey('y') ||
+          !bottomLeft.containsKey('x') || !bottomLeft.containsKey('y')) {
+        debugPrint('❌ Corners missing x or y coordinates');
+        return null;
+      }
+      
+      // Get all x and y coordinates
+      final xCoords = [
+        topLeft['x']!,
+        topRight['x']!,
+        bottomRight['x']!,
+        bottomLeft['x']!
+      ];
+      
+      final yCoords = [
+        topLeft['y']!,
+        topRight['y']!,
+        bottomRight['y']!,
+        bottomLeft['y']!
+      ];
+      
+      // Calculate EXACT bounding box - NO PADDING
+      final minX = xCoords.reduce((a, b) => a < b ? a : b);
+      final maxX = xCoords.reduce((a, b) => a > b ? a : b);
+      final minY = yCoords.reduce((a, b) => a < b ? a : b);
+      final maxY = yCoords.reduce((a, b) => a > b ? a : b);
+      
+      debugPrint('📐 Exact bounding box: ($minX, $minY) to ($maxX, $maxY)');
+      
+      // Calculate dimensions
+      final width = maxX - minX;
+      final height = maxY - minY;
+      
+      // Validate dimensions
+      if (width <= 0 || height <= 0) {
+        debugPrint('❌ Invalid dimensions: ${width}x$height');
+        return null;
+      }
+      
+      // NO PADDING - Exact crop based on detected corners
+      final cropX = minX.clamp(0.0, sourceImage.width - 1.0).toInt();
+      final cropY = minY.clamp(0.0, sourceImage.height - 1.0).toInt();
+      final cropWidth = width.clamp(1.0, sourceImage.width - cropX.toDouble()).toInt();
+      final cropHeight = height.clamp(1.0, sourceImage.height - cropY.toDouble()).toInt();
+      
+      debugPrint('✂️ EXACT Cropping: x=$cropX, y=$cropY, w=$cropWidth, h=$cropHeight');
+      
+      // Validate crop dimensions
+      if (cropWidth <= 0 || cropHeight <= 0) {
+        debugPrint('❌ Invalid crop dimensions: ${cropWidth}x$cropHeight');
+        return null;
+      }
+      
+      // Perform EXACT crop
+      final croppedImage = img.copyCrop(
+        sourceImage,
+        x: cropX,
+        y: cropY,
+        width: cropWidth,
+        height: cropHeight,
+      );
+      
+      debugPrint('✅ Exact crop complete: ${croppedImage.width}x${croppedImage.height}');
+      return croppedImage;
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Corner-based crop failed: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return null;
+    }
+  }
+
+  // 🆕 NEW METHOD: Show version warning dialog
+  void _showVersionWarningDialog(int detectedVersion) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.orange.shade600, size: 32),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Unsupported QR Version',
+                  style: TextStyle(
+                    color: Colors.orange.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300, width: 2),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '⚠️ Version Mismatch',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'This QR code is Version $detectedVersion.\n\n'
+                      'Our security model is specifically trained to analyze Version 13 QR codes only.\n\n'
+                      'Analyzing other versions may produce inaccurate results.',
+                      style: TextStyle(
+                        color: Colors.orange.shade700,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Why Version 13?',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Version 13 QR codes have a specific 69x69 module structure that our AI model was trained on. Different versions have different dimensions and patterns, requiring separate training.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFFF8A00),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Understood'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showPostAnalysisDialog(String result, double confidence, String content) {
     final isMalicious = result == "Malicious";
     final confidencePercentage = (confidence * 100).toStringAsFixed(1);
     
     showDialog(
       context: context,
-      barrierDismissible: false, // Force user to make a choice
+      barrierDismissible: false, 
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -1194,182 +1650,326 @@ Widget build(BuildContext context) {
         ),
       ),
     ),
-    body: Container(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Display section
-            if (_selectedImage != null || _regeneratedQRImage != null) ...[
-              _buildQRDisplay(),
-              const SizedBox(height: 20),
-            ],
-            
-            // Analysis indicator
-            if (_isAnalyzing) ...[
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFFFF8A00)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.shade200,
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
+    body: Stack(
+      children: [
+        // Main content
+        Container(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                // Version checker status indicator
+                if (!_webViewReady)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade300),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.orange.shade700,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Initializing version checker...',
+                          style: TextStyle(color: Colors.orange.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
+                
+                // Display section
+                if (_selectedImage != null || _regeneratedQRImage != null) ...[
+                  _buildQRDisplay(),
+                  const SizedBox(height: 20),
+                ],
+                
+                // Analysis indicator
+                if (_isAnalyzing) ...[
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Color(0xFFFF8A00)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.shade200,
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        CircularProgressIndicator(color: Color(0xFFFF8A00)),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Analyzing QR Code...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                
+                // Result display
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.shade200,
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.analytics,
+                        size: 32,
+                        color: Color(0xFFFF8A00),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _result,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.4,
+                          color: Colors.black87,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(color: Color(0xFFFF8A00)),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Analyzing QR Code...',
+                
+                const SizedBox(height: 30),
+                
+                // Upload button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _webViewReady ? _showUploadDialog : null,
+                    icon: const Icon(Icons.upload, color: Colors.white),
+                    label: const Text(
+                      'Upload QR Code',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade700,
+                        color: Colors.white,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-            
-            // Result display
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.shade200,
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.analytics,
-                    size: 32,
-                    color: Color(0xFFFF8A00),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _result,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.4,
-                      color: Colors.black87,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFFFF8A00),
+                      elevation: 8,
+                      shadowColor: Colors.black.withOpacity(0.3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      disabledBackgroundColor: Colors.grey,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 30),
-            
-            // Upload button
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: _showUploadDialog,
-                icon: const Icon(Icons.upload, color: Colors.white),
-                label: const Text(
-                  'Upload QR Code',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFFFF8A00),
-                  elevation: 8,
-                  shadowColor: Colors.black.withOpacity(0.3),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                ),
-              ),
-            ),
 
-            // Review Analysis button (only show if there's a completed analysis)
-            if (_decodedContent != null && _analysisResult != null) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showPostAnalysisDialog(
-                    _analysisResult!, 
-                    _analysisConfidence!, 
-                    _decodedContent!
-                  ),
-                  icon: Icon(Icons.info_outline, color: Color(0xFFFF8A00)),
-                  label: Text(
-                    'Review Analysis Results',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFFFF8A00),
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Color(0xFFFF8A00), width: 2),
-                    backgroundColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            
-            const SizedBox(height: 30),
-            
-            // Status indicator
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: _isInitialized 
-                  ? Color(0xFFFF8A00).withOpacity(0.1) 
-                  : Colors.orange.shade600.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _isInitialized ? Color(0xFFFF8A00) : Colors.orange.shade600,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isInitialized ? Icons.check_circle : Icons.hourglass_empty,
-                    color: _isInitialized ? Color(0xFFFF8A00) : Colors.orange.shade600,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isInitialized ? "Model Ready" : "Loading Model...",
-                    style: TextStyle(
-                      color: _isInitialized ? Color(0xFFFF8A00) : Colors.orange.shade600,
-                      fontWeight: FontWeight.w600,
+                // Review Analysis button (only show if there's a completed analysis)
+                if (_decodedContent != null && _analysisResult != null) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showPostAnalysisDialog(
+                        _analysisResult!, 
+                        _analysisConfidence!, 
+                        _decodedContent!
+                      ),
+                      icon: Icon(Icons.info_outline, color: Color(0xFFFF8A00)),
+                      label: Text(
+                        'Review Analysis Results',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFFF8A00),
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Color(0xFFFF8A00), width: 2),
+                        backgroundColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
                     ),
                   ),
                 ],
-              ),
+                
+                const SizedBox(height: 30),
+                
+                // Status indicator
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _isInitialized 
+                      ? Color(0xFFFF8A00).withOpacity(0.1) 
+                      : Colors.orange.shade600.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _isInitialized ? Color(0xFFFF8A00) : Colors.orange.shade600,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isInitialized ? Icons.check_circle : Icons.hourglass_empty,
+                        color: _isInitialized ? Color(0xFFFF8A00) : Colors.orange.shade600,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isInitialized ? "Model Ready" : "Loading Model...",
+                        style: TextStyle(
+                          color: _isInitialized ? Color(0xFFFF8A00) : Colors.orange.shade600,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+
+        // HIDDEN WEBVIEW FOR VERSION CHECKING
+        Positioned(
+          left: -10000,
+          top: -10000,
+          width: 1,
+          height: 1,
+          child: InAppWebView(
+            initialData: InAppWebViewInitialData(
+              data: _getVersionCheckerHtml(),
+              baseUrl: WebUri('about:blank'),
+            ),
+            initialSettings: InAppWebViewSettings(
+              javaScriptEnabled: true,
+              domStorageEnabled: true,
+            ),
+            onWebViewCreated: (controller) async {
+              debugPrint('🌐 WebView created');
+              
+              // Add handler for successful version detection
+              controller.addJavaScriptHandler(
+              handlerName: 'QRVersionResult',
+              callback: (args) {
+                debugPrint('📥 Raw received data: $args');
+                if (args.isNotEmpty && mounted) {
+                  try {
+                    final jsonData = args[0];
+                    
+                    Map<String, dynamic> parsedData;
+                    if (jsonData is Map) {
+                      parsedData = Map<String, dynamic>.from(jsonData);
+                    } else if (jsonData is String) {
+                      parsedData = json.decode(jsonData);
+                    } else {
+                      throw Exception('Unexpected data type: ${jsonData.runtimeType}');
+                    }
+                    
+                    // ✅ FIXED: Ensure location is properly parsed
+                    if (parsedData['location'] != null) {
+                      final location = parsedData['location'];
+                      debugPrint('📍 Raw location: $location');
+                      debugPrint('📍 Location type: ${location.runtimeType}');
+                      
+                      // Ensure location is a Map
+                      if (location is Map) {
+                        parsedData['location'] = Map<String, dynamic>.from(location);
+                      }
+                    }
+                    
+                    final metadata = QRVersionMetadata.fromJson(parsedData);
+                    setState(() {
+                      _qrVersionMetadata = metadata;
+                    });
+                    
+                    debugPrint('✅ QR Version: ${metadata.toString()}');
+                    debugPrint('📍 Has location: ${metadata.location != null}');
+                    debugPrint('📍 Has corners: ${metadata.corners != null}');
+                    
+                    if (metadata.corners != null) {
+                      debugPrint('📍 Parsed corners: ${metadata.corners}');
+                    } else if (metadata.location != null) {
+                      debugPrint('⚠️ Location exists but corner parsing failed');
+                      debugPrint('📍 Location keys: ${metadata.location!.keys}');
+                    }
+                  } catch (e, stackTrace) {
+                    debugPrint('❌ Error parsing version: $e');
+                    debugPrint('Stack trace: $stackTrace');
+                  }
+                }
+              },
+            );
+
+              // Add handler for errors
+              controller.addJavaScriptHandler(
+                handlerName: 'QRVersionError',
+                callback: (args) {
+                  debugPrint('⚠️ QR Version Error: ${args[0]}');
+                  if (mounted) {
+                    setState(() {
+                      _qrVersionMetadata = null;
+                    });
+                  }
+                },
+              );
+
+              await _versionChecker?.initialize(controller);
+              
+              // Test the connection
+              final testResult = await controller.evaluateJavascript(
+                source: 'window.testChecker ? window.testChecker() : "not ready"'
+              );
+              debugPrint('🧪 Test result: $testResult');
+              
+              if (mounted) {
+                setState(() {
+                  _webViewReady = true;
+                });
+              }
+              debugPrint('✅ WebView ready');
+            },
+            onLoadStop: (controller, url) async {
+              debugPrint('✅ WebView load complete');
+            },
+            onConsoleMessage: (controller, consoleMessage) {
+              debugPrint('🖥️ JS: ${consoleMessage.message}');
+            },
+          ),
+        )
+      ],
     ),
   );
 }
@@ -1822,14 +2422,14 @@ class _HistoryPageState extends State<HistoryPage> {
                               ),
                               const SizedBox(width: 8),
                               FilterChip(
-                                label: const Text('Benign'),
+                                label: const Text('Safe'),
                                 labelStyle: TextStyle(
-                                  color: _filterBy == 'benign' ? Colors.white : Colors.grey[400],
+                                  color: _filterBy == 'safe' ? Colors.white : Colors.grey[400],
                                 ),
-                                selected: _filterBy == 'benign',
+                                selected: _filterBy == 'safe',
                                 selectedColor: Colors.green.shade600,
                                 backgroundColor: Color(0xFF3A3838),
-                                onSelected: (selected) => setState(() => _filterBy = 'benign'),
+                                onSelected: (selected) => setState(() => _filterBy = 'safe'),
                               ),
                             ],
                           ),
@@ -2465,93 +3065,4 @@ class _QRScannerPageState extends State<QRScannerPage> {
       ),
     );
   }
-}
-
-Future<img.Image?> _extractQRFromImage(File imageFile) async {
-  BarcodeScanner? barcodeScanner;
-  
-  try {
-    final bytes = await imageFile.readAsBytes();
-    final image = img.decodeImage(bytes);
-    
-    if (image == null) {
-      debugPrint("Failed to decode image");
-      return null;
-    }
-    
-    // Use ML Kit to detect QR code boundaries
-    final inputImage = InputImage.fromFile(imageFile);
-    barcodeScanner = BarcodeScanner(
-      formats: [BarcodeFormat.qrCode]
-    );
-    
-    final List<Barcode> barcodes = await barcodeScanner.processImage(inputImage);
-    
-    if (barcodes.isEmpty) {
-      debugPrint("No QR code detected in image");
-      return null;
-    }
-    
-    // Get the first QR code's bounding box
-    final barcode = barcodes.first;
-    final boundingBox = barcode.boundingBox;
-    
-    if (boundingBox == null) {
-      debugPrint("QR detected but no bounding box");
-      return null;
-    }
-    
-    // Add 5% padding to ensure we capture the whole QR
-    const padding = 0.05;
-    final paddingX = (boundingBox.width * padding).toInt();
-    final paddingY = (boundingBox.height * padding).toInt();
-    
-    // Convert to double, perform calculation, then clamp and convert to int
-    final cropX = (boundingBox.left.toDouble() - paddingX)
-        .clamp(0.0, (image.width - 1).toDouble())
-        .toInt();
-    final cropY = (boundingBox.top.toDouble() - paddingY)
-        .clamp(0.0, (image.height - 1).toDouble())
-        .toInt();
-    final cropWidth = (boundingBox.width + paddingX * 2)
-        .clamp(1, image.width - cropX)
-        .toInt();
-    final cropHeight = (boundingBox.height + paddingY * 2)
-        .clamp(1, image.height - cropY)
-        .toInt();
-    
-    // Crop to QR region
-    final croppedImage = img.copyCrop(image,
-      x: cropX,
-      y: cropY,
-      width: cropWidth,
-      height: cropHeight,
-    );
-    
-    debugPrint("QR extracted: ${croppedImage.width}x${croppedImage.height}");
-    return croppedImage;
-    
-  } catch (e) {
-    debugPrint("QR extraction error: $e");
-    return null;
-  } finally {
-    await barcodeScanner?.close();
-  }
-}
-
-/// Convert image to pure black and white (binarization)
-img.Image _binarizeImage(img.Image image) {
-  const threshold = 128;
-  final binarized = image.clone();
-  
-  for (int y = 0; y < binarized.height; y++) {
-    for (int x = 0; x < binarized.width; x++) {
-      final pixel = binarized.getPixel(x, y);
-      final gray = pixel.r.toInt(); // Already grayscale
-      final binary = gray > threshold ? 255 : 0;
-      binarized.setPixel(x, y, img.ColorRgb8(binary, binary, binary));
-    }
-  }
-  
-  return binarized;
 }

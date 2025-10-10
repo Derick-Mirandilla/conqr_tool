@@ -29,6 +29,7 @@ dependencies:
   flutter_launcher_icons: ^0.13.1
   google_mlkit_barcode_scanning: ^0.10.0
   file_picker: ^8.0.0+1
+  flutter_inappwebview: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -49,4 +50,5 @@ flutter:
     - assets/images/malicious_sample.png
     - assets/models/qr_security_model.tflite
     - assets/models/model.tflite
+    - assets/models/model_weighted.tflite
     - assets/images/
