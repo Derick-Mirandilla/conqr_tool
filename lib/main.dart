@@ -629,6 +629,101 @@ class _MainAppPageState extends State<MainAppPage> {
     }
   }
 
+  void _showNoQRCodeDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.orange.shade600, size: 32),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'No QR Code Detected',
+                  style: TextStyle(
+                    color: Colors.orange.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300, width: 2),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '⚠️ Invalid Image',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No QR code was detected in the uploaded image.\n\n'
+                      'Please ensure:\n'
+                      '• The image contains a valid QR code\n'
+                      '• The QR code is clearly visible\n'
+                      '• The image is not blurry or distorted\n'
+                      '• There is good lighting and contrast',
+                      style: TextStyle(
+                        color: Colors.orange.shade700,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Try Again:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '• Upload a different image with a QR code\n'
+                '• Use the camera scanner for real-time detection\n'
+                '• Ensure the QR code fills most of the image',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFFF8A00),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Try Again'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Future<void> _processQRCode() async {
     if (!_isInitialized) {
@@ -675,7 +770,7 @@ class _MainAppPageState extends State<MainAppPage> {
             await Future.delayed(Duration(milliseconds: 500));
             
             if (_qrVersionMetadata != null) {
-              debugPrint('📊 QR Metadata: ${_qrVersionMetadata.toString()}');
+            debugPrint('📊 QR Metadata: ${_qrVersionMetadata.toString()}');
               
               // ⚠️ VERSION VALIDATION
               if (!_qrVersionMetadata!.isVersion13()) {
@@ -721,19 +816,16 @@ class _MainAppPageState extends State<MainAppPage> {
               return;
             }
           } else {
+            // ⚠️ NO QR CODE DETECTED - Show dialog instead of inline message
             setState(() {
-              _result = "⚠️ Could not detect QR code boundaries.\n\n"
-                  "Tips:\n"
-                  "• Ensure QR code is fully visible\n"
-                  "• Avoid glare or shadows\n"
-                  "• Use a clear, focused image\n"
-                  "• Try scanning with camera instead";
+              _result = "⚠️ No QR code detected in image";
               _isAnalyzing = false;
               _decodedContent = null;
               _analysisResult = null;
               _analysisConfidence = null;
               _regeneratedQRImage = null;
             });
+            _showNoQRCodeDialog();
             return;
           }
           
@@ -752,6 +844,20 @@ class _MainAppPageState extends State<MainAppPage> {
           _result = "No QR code to process";
           _isAnalyzing = false;
         });
+        return;
+      }
+
+      // ⚠️ CHECK IF QR CODE WAS DECODED (for 69x69 direct analysis path)
+      if (_selectedImage != null && (decodedContent == null || decodedContent.isEmpty)) {
+        setState(() {
+          _result = "⚠️ No QR code detected in image";
+          _isAnalyzing = false;
+          _decodedContent = null;
+          _analysisResult = null;
+          _analysisConfidence = null;
+          _regeneratedQRImage = null;
+        });
+        _showNoQRCodeDialog();
         return;
       }
 
@@ -823,7 +929,6 @@ class _MainAppPageState extends State<MainAppPage> {
       });
     }
   }
-
 
   img.Image? _cropQRUsingCorners(img.Image sourceImage, List<Map<String, double>> corners) {
     try {
