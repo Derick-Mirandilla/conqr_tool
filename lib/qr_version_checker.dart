@@ -1,6 +1,3 @@
-// File: lib/qr_version_checker.dart
-// Add this new file to your project
-
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -31,8 +28,6 @@ class QRVersionChecker {
   }
 
   static Future<QRMetadata?> _decodeQRWithWebView(String base64Image) async {
-    // This will be handled by the WebView widget in the main app
-    // For now, return null - we'll integrate it properly
     return null;
   }
 }

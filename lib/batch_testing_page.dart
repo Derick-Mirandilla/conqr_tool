@@ -55,7 +55,7 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'webp'],
         dialogTitle: 'Select Benign Images',
-        withData: false, // Don't load file data into memory
+        withData: false, 
         withReadStream: false,
       );
 
@@ -121,14 +121,12 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
   }
 
 
-
   List<List<List<List<double>>>> _preprocessImage(img.Image image) {
     
     final input = List.generate(1, (_) => 
       List.generate(69, (y) => 
         List.generate(69, (x) {
           final pixel = image.getPixel(x, y);
-          // Get the grayscale value and normalize
           final grayValue = pixel.r.toDouble() / 255.0;
           return [grayValue];
         })
@@ -178,8 +176,7 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
             debugPrint('Failed to decode image: ${imageFile.path}');
             continue;
           }
-          
-          // Don't use img.grayscale() - convert manually during preprocessing
+
           final input = _preprocessImage(image);
           final output = List.generate(1, (_) => List.filled(1, 0.0));
           _interpreter.run(input, output);
