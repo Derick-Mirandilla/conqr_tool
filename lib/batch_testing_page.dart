@@ -165,6 +165,11 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
       // Debug: Track probability distributions
       List<double> benignProbs = [];
       List<double> maliciousProbs = [];
+      
+      // Track rejected images
+      int rejectedBenign = 0;
+      int rejectedMalicious = 0;
+      List<String> rejectedFiles = [];
 
       // Process benign images (label = 0)
       for (var imageFile in _benignImages) {
@@ -174,6 +179,15 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
           
           if (image == null) {
             debugPrint('Failed to decode image: ${imageFile.path}');
+            continue;
+          }
+
+          // REJECT non-69x69 images
+          if (image.width != 69 || image.height != 69) {
+            debugPrint('REJECTED: ${imageFile.path.split('/').last} (${image.width}x${image.height}) - Only 69x69 images allowed');
+            rejectedBenign++;
+            rejectedFiles.add('${imageFile.path.split('/').last} (${image.width}x${image.height})');
+            setState(() => _processedCount++);
             continue;
           }
 
@@ -204,6 +218,14 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
             continue;
           }
           
+          //REJECT non-69x69 images
+          if (image.width != 69 || image.height != 69) {
+            debugPrint('REJECTED: ${imageFile.path.split('/').last} (${image.width}x${image.height}) - Only 69x69 images allowed');
+            rejectedMalicious++;
+            rejectedFiles.add('${imageFile.path.split('/').last} (${image.width}x${image.height})');
+            setState(() => _processedCount++);
+            continue;
+          }
 
           final input = _preprocessImage(image);
           final output = List.generate(1, (_) => List.filled(1, 0.0));
@@ -425,7 +447,7 @@ class _BatchTestingPageState extends State<BatchTestingPage> {
               const SizedBox(height: 24),
 
               // Image Selection Section
-              _buildSectionTitle('1. Select Test Images'),
+              _buildSectionTitle('1. Select Test Images\n(QR Version 13 - 69x69 only)'),
               const SizedBox(height: 12),
               
               _buildImageSelector(

@@ -450,18 +450,18 @@ class _MainAppPageState extends State<MainAppPage> {
       <canvas id="canvas" style="display:none;"></canvas>
       
       <script>
-          console.log('✅ QR Version Checker JS loaded');
+          console.log('QR Version Checker JS loaded');
           
           const canvas = document.getElementById('canvas');
           const ctx = canvas.getContext('2d');
 
           function decodeQRForVersion(base64Data) {
-              console.log('🔍 Decoding QR for version...');
+              console.log('Decoding QR for version...');
               
               const img = new Image();
               
               img.onload = function() {
-                  console.log('📷 Image loaded:', img.width, 'x', img.height);
+                  console.log('Image loaded:', img.width, 'x', img.height);
                   
                   canvas.width = img.width;
                   canvas.height = img.height;
@@ -473,7 +473,7 @@ class _MainAppPageState extends State<MainAppPage> {
                   if (code) {
                       const moduleCount = (code.version - 1) * 4 + 21;
                       
-                      // ✅ FIXED: Properly extract corner coordinates from jsQR location object
+                      // Properly extract corner coordinates from jsQR location object
                       const result = {
                           version: code.version,
                           errorCorrection: code.errorCorrectionLevel || 'L',
@@ -500,17 +500,17 @@ class _MainAppPageState extends State<MainAppPage> {
                           }
                       };
                       
-                      console.log('✅ QR Decoded:', result);
-                      console.log('📍 Corners:', result.location);
+                      console.log('QR Decoded:', result);
+                      console.log('Corners:', result.location);
                       
                       // Send result to Flutter
                       if (window.flutter_inappwebview) {
                           window.flutter_inappwebview.callHandler('QRVersionResult', result);
                       } else {
-                          console.error('❌ Flutter bridge not available');
+                          console.error('Flutter bridge not available');
                       }
                   } else {
-                      console.warn('⚠️ No QR code detected');
+                      console.warn('No QR code detected');
                       if (window.flutter_inappwebview) {
                           window.flutter_inappwebview.callHandler('QRVersionError', 'No QR code detected');
                       }
@@ -518,7 +518,7 @@ class _MainAppPageState extends State<MainAppPage> {
               };
               
               img.onerror = function(e) {
-                  console.error('❌ Failed to load image:', e);
+                  console.error('Failed to load image:', e);
                   if (window.flutter_inappwebview) {
                       window.flutter_inappwebview.callHandler('QRVersionError', 'Failed to load image');
                   }
@@ -529,7 +529,7 @@ class _MainAppPageState extends State<MainAppPage> {
           
           // Test function
           window.testChecker = function() {
-              console.log('🧪 Version checker is active');
+              console.log('Version checker is active');
               return 'OK';
           };
       </script>
@@ -734,7 +734,7 @@ class _MainAppPageState extends State<MainAppPage> {
     setState(() => _isAnalyzing = true);
 
     try {
-      img.Image? qrImage; // Make it nullable
+      img.Image? qrImage; 
       String? decodedContent;
       bool usedDirectAnalysis = false;
       
@@ -751,9 +751,9 @@ class _MainAppPageState extends State<MainAppPage> {
           return;
         }
         
-        // ✅ CHECK IF IMAGE IS EXACTLY 69x69
+        // CHECK IF IMAGE IS EXACTLY 69x69
         if (loadedImage.width == 69 && loadedImage.height == 69) {
-          // ✅ PERFECT 69x69 - Use directly, skip version checking
+          // PERFECT 69x69 - Use directly, skip version checking
           debugPrint("69x69 image detected - skipping version check, using directly");
           qrImage = loadedImage;
           usedDirectAnalysis = true;
@@ -762,7 +762,7 @@ class _MainAppPageState extends State<MainAppPage> {
           decodedContent = await _decodeQRFromImage(_selectedImage!);
           
         } else {
-          // 🆕 CHECK QR VERSION (only for non-69x69 images that need processing)
+          // CHECK QR VERSION (only for non-69x69 images that need processing)
           if (_versionChecker?.isReady == true) {
             debugPrint('Checking QR version for real-world image...');
             await _versionChecker!.checkVersion(_selectedImage!);
@@ -772,7 +772,7 @@ class _MainAppPageState extends State<MainAppPage> {
             if (_qrVersionMetadata != null) {
             debugPrint('QR Metadata: ${_qrVersionMetadata.toString()}');
               
-              // ⚠️ VERSION VALIDATION
+              // VERSION VALIDATION
               if (!_qrVersionMetadata!.isVersion13()) {
                 setState(() {
                   _result = "Unsupported QR Version";
@@ -816,7 +816,7 @@ class _MainAppPageState extends State<MainAppPage> {
               return;
             }
           } else {
-            // ⚠️ NO QR CODE DETECTED - Show dialog instead of inline message
+            // NO QR CODE DETECTED - Show dialog instead of inline message
             setState(() {
               _result = "⚠️ No QR code detected in image";
               _isAnalyzing = false;
@@ -847,7 +847,7 @@ class _MainAppPageState extends State<MainAppPage> {
         return;
       }
 
-      // ⚠️ CHECK IF QR CODE WAS DECODED (for 69x69 direct analysis path)
+      // CHECK IF QR CODE WAS DECODED (for 69x69 direct analysis path)
       if (_selectedImage != null && (decodedContent == null || decodedContent.isEmpty)) {
         setState(() {
           _result = "⚠️ No QR code detected in image";
@@ -877,7 +877,7 @@ class _MainAppPageState extends State<MainAppPage> {
         return;
       }
       
-      // ✅ Preprocess image (will resize if needed)
+      // Preprocess image (will resize if needed)
       final input = _preprocessImage(qrImage);
       final output = List.generate(1, (_) => List.filled(1, 0.0));
       
@@ -1572,7 +1572,7 @@ class _MainAppPageState extends State<MainAppPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Upload QR Code'),
+          title: const Text('Upload QR Code\nSupported Version: 13'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2003,7 +2003,7 @@ Widget build(BuildContext context) {
                       throw Exception('Unexpected data type: ${jsonData.runtimeType}');
                     }
                     
-                    // ✅ FIXED: Ensure location is properly parsed
+                    // Ensure location is properly parsed
                     if (parsedData['location'] != null) {
                       final location = parsedData['location'];
                       debugPrint('Raw location: $location');
