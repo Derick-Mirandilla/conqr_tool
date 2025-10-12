@@ -30,7 +30,7 @@ class QRVersionChecker {
 
   Future<QRVersionMetadata?> checkVersion(File imageFile) async {
     if (!_isReady || _webViewController == null) {
-      debugPrint('⚠️ Version checker not ready');
+      debugPrint('Version checker not ready');
       return null;
     }
 
@@ -38,7 +38,7 @@ class QRVersionChecker {
       final bytes = await imageFile.readAsBytes();
       final base64Image = base64Encode(bytes);
       
-      debugPrint('📤 Sending image to JS decoder...');
+      debugPrint('Sending image to JS decoder...');
       
       // Call JavaScript function
       await _webViewController!.evaluateJavascript(source: '''
@@ -52,12 +52,12 @@ class QRVersionChecker {
         })();
       ''');
       
-      debugPrint('✅ Image sent to decoder');
+      debugPrint('Image sent to decoder');
       
       // Note: Actual result comes through the handler callback
       return null;
     } catch (e) {
-      debugPrint('❌ Error checking QR version: $e');
+      debugPrint('Error checking QR version: $e');
       return null;
     }
   }
@@ -123,7 +123,7 @@ class QRVersionMetadata {
          'y': (bottomLeft['y'] as num).toDouble()},
       ];
     } catch (e) {
-      debugPrint('❌ Error parsing corners: $e');
+      debugPrint('Error parsing corners: $e');
       return null;
     }
   }
@@ -754,7 +754,7 @@ class _MainAppPageState extends State<MainAppPage> {
         // ✅ CHECK IF IMAGE IS EXACTLY 69x69
         if (loadedImage.width == 69 && loadedImage.height == 69) {
           // ✅ PERFECT 69x69 - Use directly, skip version checking
-          debugPrint("✅ Perfect 69x69 image detected - skipping version check, using directly");
+          debugPrint("69x69 image detected - skipping version check, using directly");
           qrImage = loadedImage;
           usedDirectAnalysis = true;
           
@@ -764,13 +764,13 @@ class _MainAppPageState extends State<MainAppPage> {
         } else {
           // 🆕 CHECK QR VERSION (only for non-69x69 images that need processing)
           if (_versionChecker?.isReady == true) {
-            debugPrint('🔍 Checking QR version for real-world image...');
+            debugPrint('Checking QR version for real-world image...');
             await _versionChecker!.checkVersion(_selectedImage!);
             // Wait for result
             await Future.delayed(Duration(milliseconds: 500));
             
             if (_qrVersionMetadata != null) {
-            debugPrint('📊 QR Metadata: ${_qrVersionMetadata.toString()}');
+            debugPrint('QR Metadata: ${_qrVersionMetadata.toString()}');
               
               // ⚠️ VERSION VALIDATION
               if (!_qrVersionMetadata!.isVersion13()) {
@@ -788,25 +788,25 @@ class _MainAppPageState extends State<MainAppPage> {
                 return; // Stop processing
               }
               
-              debugPrint('✅ Version 13 confirmed - proceeding with analysis');
+              debugPrint('Version 13 confirmed - proceeding with analysis');
             } else {
-              debugPrint('⚠️ Could not detect QR version - proceeding anyway');
+              debugPrint('Could not detect QR version - proceeding anyway');
             }
           }
           
           // ===== REAL-WORLD MODE: Requires cropping & processing =====
-          debugPrint("🌍 REAL-WORLD: ${loadedImage.width}×${loadedImage.height} image - processing required");
+          debugPrint("REAL-WORLD: ${loadedImage.width}×${loadedImage.height} image - processing required");
           
           if (_qrVersionMetadata?.corners != null) {
-            debugPrint("✂️ Using corner-based cropping");
+            debugPrint("Using corner-based cropping");
             final extractedQR = _cropQRUsingCorners(loadedImage, _qrVersionMetadata!.corners!);
             
             if (extractedQR != null) {
               qrImage = extractedQR;
-              debugPrint("📐 Cropped QR: ${qrImage.width}×${qrImage.height}");
+              debugPrint("Cropped QR: ${qrImage.width}×${qrImage.height}");
             } else {
               setState(() {
-                _result = "⚠️ Failed to crop QR code region.\n\nPlease try again with a clearer image.";
+                _result = "Failed to crop QR code region.\n\nPlease try again with a clearer image.";
                 _isAnalyzing = false;
                 _decodedContent = null;
                 _analysisResult = null;
@@ -835,7 +835,7 @@ class _MainAppPageState extends State<MainAppPage> {
         
       } else if (_qrContent != null) {
         // ========== PATH B: CAMERA SCAN ==========
-        debugPrint("📷 CAMERA MODE: Regenerating from content");
+        debugPrint("CAMERA MODE: Regenerating from content");
         qrImage = _generateStandardQR(_qrContent!);
         decodedContent = _qrContent;
         
@@ -887,7 +887,7 @@ class _MainAppPageState extends State<MainAppPage> {
       final label = rawScore >= 0.50 ? "Malicious" : "Safe";
       final displayConfidence = label == "Safe" ? (1.0 - rawScore) : rawScore;
       
-      debugPrint("🎯 Result: $label (${(displayConfidence * 100).toStringAsFixed(1)}%)");
+      debugPrint("Result: $label (${(displayConfidence * 100).toStringAsFixed(1)}%)");
       
       // Store results
       _decodedContent = decodedContent;
@@ -921,7 +921,7 @@ class _MainAppPageState extends State<MainAppPage> {
       }
       
     } catch (e, stackTrace) {
-      debugPrint("❌ Error: $e");
+      debugPrint("Error: $e");
       debugPrint("Stack: $stackTrace");
       setState(() {
         _result = "Error processing QR: $e";
@@ -932,11 +932,11 @@ class _MainAppPageState extends State<MainAppPage> {
 
   img.Image? _cropQRUsingCorners(img.Image sourceImage, List<Map<String, double>> corners) {
     try {
-      debugPrint('📍 Input corners: $corners');
+      debugPrint('Input corners: $corners');
       
       // Validate corners
       if (corners.length != 4) {
-        debugPrint('❌ Invalid corners count: ${corners.length}');
+        debugPrint('Invalid corners count: ${corners.length}');
         return null;
       }
       
@@ -951,7 +951,7 @@ class _MainAppPageState extends State<MainAppPage> {
           !topRight.containsKey('x') || !topRight.containsKey('y') ||
           !bottomRight.containsKey('x') || !bottomRight.containsKey('y') ||
           !bottomLeft.containsKey('x') || !bottomLeft.containsKey('y')) {
-        debugPrint('❌ Corners missing x or y coordinates');
+        debugPrint('Corners missing x or y coordinates');
         return null;
       }
       
@@ -976,7 +976,7 @@ class _MainAppPageState extends State<MainAppPage> {
       final minY = yCoords.reduce((a, b) => a < b ? a : b);
       final maxY = yCoords.reduce((a, b) => a > b ? a : b);
       
-      debugPrint('📐 Exact bounding box: ($minX, $minY) to ($maxX, $maxY)');
+      debugPrint('Exact bounding box: ($minX, $minY) to ($maxX, $maxY)');
       
       // Calculate dimensions
       final width = maxX - minX;
@@ -984,7 +984,7 @@ class _MainAppPageState extends State<MainAppPage> {
       
       // Validate dimensions
       if (width <= 0 || height <= 0) {
-        debugPrint('❌ Invalid dimensions: ${width}x$height');
+        debugPrint('Invalid dimensions: ${width}x$height');
         return null;
       }
       
@@ -994,11 +994,11 @@ class _MainAppPageState extends State<MainAppPage> {
       final cropWidth = width.clamp(1.0, sourceImage.width - cropX.toDouble()).toInt();
       final cropHeight = height.clamp(1.0, sourceImage.height - cropY.toDouble()).toInt();
       
-      debugPrint('✂️ EXACT Cropping: x=$cropX, y=$cropY, w=$cropWidth, h=$cropHeight');
+      debugPrint('EXACT Cropping: x=$cropX, y=$cropY, w=$cropWidth, h=$cropHeight');
       
       // Validate crop dimensions
       if (cropWidth <= 0 || cropHeight <= 0) {
-        debugPrint('❌ Invalid crop dimensions: ${cropWidth}x$cropHeight');
+        debugPrint('Invalid crop dimensions: ${cropWidth}x$cropHeight');
         return null;
       }
       
@@ -1011,11 +1011,11 @@ class _MainAppPageState extends State<MainAppPage> {
         height: cropHeight,
       );
       
-      debugPrint('✅ Exact crop complete: ${croppedImage.width}x${croppedImage.height}');
+      debugPrint('Exact crop complete: ${croppedImage.width}x${croppedImage.height}');
       return croppedImage;
       
     } catch (e, stackTrace) {
-      debugPrint('❌ Corner-based crop failed: $e');
+      debugPrint('Corner-based crop failed: $e');
       debugPrint('Stack trace: $stackTrace');
       return null;
     }
@@ -1983,13 +1983,13 @@ Widget build(BuildContext context) {
               domStorageEnabled: true,
             ),
             onWebViewCreated: (controller) async {
-              debugPrint('🌐 WebView created');
+              debugPrint('WebView created');
               
               // Add handler for successful version detection
               controller.addJavaScriptHandler(
               handlerName: 'QRVersionResult',
               callback: (args) {
-                debugPrint('📥 Raw received data: $args');
+                debugPrint('Raw received data: $args');
                 if (args.isNotEmpty && mounted) {
                   try {
                     final jsonData = args[0];
@@ -2006,8 +2006,8 @@ Widget build(BuildContext context) {
                     // ✅ FIXED: Ensure location is properly parsed
                     if (parsedData['location'] != null) {
                       final location = parsedData['location'];
-                      debugPrint('📍 Raw location: $location');
-                      debugPrint('📍 Location type: ${location.runtimeType}');
+                      debugPrint('Raw location: $location');
+                      debugPrint('Location type: ${location.runtimeType}');
                       
                       // Ensure location is a Map
                       if (location is Map) {
@@ -2020,18 +2020,18 @@ Widget build(BuildContext context) {
                       _qrVersionMetadata = metadata;
                     });
                     
-                    debugPrint('✅ QR Version: ${metadata.toString()}');
-                    debugPrint('📍 Has location: ${metadata.location != null}');
-                    debugPrint('📍 Has corners: ${metadata.corners != null}');
+                    debugPrint('QR Version: ${metadata.toString()}');
+                    debugPrint('Has location: ${metadata.location != null}');
+                    debugPrint('Has corners: ${metadata.corners != null}');
                     
                     if (metadata.corners != null) {
-                      debugPrint('📍 Parsed corners: ${metadata.corners}');
+                      debugPrint('Parsed corners: ${metadata.corners}');
                     } else if (metadata.location != null) {
-                      debugPrint('⚠️ Location exists but corner parsing failed');
-                      debugPrint('📍 Location keys: ${metadata.location!.keys}');
+                      debugPrint('Location exists but corner parsing failed');
+                      debugPrint('Location keys: ${metadata.location!.keys}');
                     }
                   } catch (e, stackTrace) {
-                    debugPrint('❌ Error parsing version: $e');
+                    debugPrint('Error parsing version: $e');
                     debugPrint('Stack trace: $stackTrace');
                   }
                 }
@@ -2042,7 +2042,7 @@ Widget build(BuildContext context) {
               controller.addJavaScriptHandler(
                 handlerName: 'QRVersionError',
                 callback: (args) {
-                  debugPrint('⚠️ QR Version Error: ${args[0]}');
+                  debugPrint('QR Version Error: ${args[0]}');
                   if (mounted) {
                     setState(() {
                       _qrVersionMetadata = null;
@@ -2057,20 +2057,20 @@ Widget build(BuildContext context) {
               final testResult = await controller.evaluateJavascript(
                 source: 'window.testChecker ? window.testChecker() : "not ready"'
               );
-              debugPrint('🧪 Test result: $testResult');
+              debugPrint('Test result: $testResult');
               
               if (mounted) {
                 setState(() {
                   _webViewReady = true;
                 });
               }
-              debugPrint('✅ WebView ready');
+              debugPrint('WebView ready');
             },
             onLoadStop: (controller, url) async {
-              debugPrint('✅ WebView load complete');
+              debugPrint('WebView load complete');
             },
             onConsoleMessage: (controller, consoleMessage) {
-              debugPrint('🖥️ JS: ${consoleMessage.message}');
+              debugPrint('JS: ${consoleMessage.message}');
             },
           ),
         )
